@@ -118,6 +118,9 @@ Get your free API key at: https://aistudio.google.com/apikey
 python app/main.py
 ```
 
+### 6. Demo Output
+![RAG Definition Output](assets/Demo.png)
+
 ---
 
 ## 🔒 Security Note
