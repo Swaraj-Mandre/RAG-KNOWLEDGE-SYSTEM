@@ -1,10 +1,10 @@
-# 🧠 RAG Knowledge System
+# RAG Knowledge System
 
 > **An AI-powered system that answers questions using your own documents — powered by Gemini 2.5 Flash & LangChain**
 
 ---
 
-## 🚀 What is this?
+## What is this?
 
 This project builds a **Retrieval-Augmented Generation (RAG)** pipeline that lets you upload your own documents and ask questions about them. Instead of relying on general AI knowledge, it retrieves exact information from *your* files and generates precise answers.
 
@@ -15,9 +15,9 @@ Document → Loader → Chunks → Embeddings → Vector DB → Query → Retrie
 
 ---
 
-## ⚙️ Two Pipelines Inside Every RAG System
+## Two Pipelines Inside Every RAG System
 
-### 🔵 A. Ingestion Pipeline *(Offline — runs once)*
+### A. Ingestion Pipeline *(Offline — runs once)*
 
 ```
 Documents
@@ -31,7 +31,7 @@ Generate Embeddings  ← Google Generative AI Embeddings
 Store in Vector DB   ← FAISS
 ```
 
-### 🟢 B. Query Pipeline *(Runtime — runs on every question)*
+### B. Query Pipeline *(Runtime — runs on every question)*
 
 ```
 User Query
@@ -46,12 +46,12 @@ Inject Context into Prompt
    ↓
 Gemini 2.5 Flash        ← LLM generates answer
    ↓
-Final Answer ✅
+Final Answer 
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
@@ -64,7 +64,7 @@ Final Answer ✅
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 rag-knowledge-system/
@@ -87,54 +87,51 @@ rag-knowledge-system/
 
 ---
 
-## ⚡ Quick Start
+##  Quick Start
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/Swaraj-Mandre/RAG-KNOWLEDGE-SYSTEM.git
-cd RAG-KNOWLEDGE-SYSTEM
-```
-
-### 2. Create virtual environment
+### 1. Create virtual environment
 ```bash
 py -3.11 -m venv venv
 venv\Scripts\activate      # Windows
 ```
 
-### 3. Install dependencies
+### 2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set up API key
+### 3. Set up API key
 Create a `.env` file:
 ```
 GOOGLE_API_KEY=your_gemini_api_key_here
 ```
 Get your free API key at: https://aistudio.google.com/apikey
 
-### 5. Run
-```bash
-python app/main.py
-```
-
-### 6. Demo Output
-![RAG Definition Output](assets/Demo.png)
-
----
-
-## 🔒 Security Note
+## Security Note
 
 > ⚠️ **Never commit your `.env` file!** It contains your API key. The `.gitignore` already excludes it.
 
+### 4. Demo Output
+![RAG Definition Output](assets/Demo.png)
+
+### 5. Ingestion Pipeline
+Load -> Split/Chunk -> Embed -> Store
+```
+vectorstore/
+├── index.faiss    ← actual vector data (embeddings)
+└── index.pkl      ← metadata & original chunk text
+```
+> I used FAISS for this project as "Just pip install" "Works Offline" and most importantly "Free Forever".
+
 ---
+
 
 ## 📌 Status
 
 - [x] Project structure setup
 - [x] Gemini 2.5 Flash API connected
-- [ ] Ingestion pipeline (`ingest.py`)
-- [ ] Vector store setup (FAISS)
+- [x] Ingestion pipeline (`ingest.py`)
+- [x] Vector store setup (FAISS)
 - [ ] RAG pipeline (`rag_pipeline.py`)
 - [ ] Query interface (`query.py`)
 
