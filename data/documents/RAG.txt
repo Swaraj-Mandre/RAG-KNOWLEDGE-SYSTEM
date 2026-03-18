@@ -1,0 +1,87 @@
+Retrieval includes retrieving the relevant document from the vector database.
+Augmentation includes the prompt engineering technique implemented on user prompt (user query) which helps in communicating with LLM.
+Generation is for generating the end result to the user by joining the retrieved documents and user prompt (after prompting).
+
+Ingestion
+Several types of ingestion such as, batch ingestion, chunks ingestion, real-time ingestion, change data capture (CDC) ingestion and streaming ingestion.
+
+What an LLM actually does (next-token prediction)
+LLM - Large Language Model, is an type of AI which uses deep learning models (Neural networks, ml algos). LLM are made to replicate human neural activity. Start by using TOKENS, words are broken into numerical representations.
+When building an LLM, you can use retrieval augmented generation (RAG) to turn your information into a vector database that the LLM pulls from to create responses.
+
+Tokens & context window
+Context-Window is finite, it refers to the limit of words/token a model can take to provide input. GPT-4 has a context window of 8,192 tokens
+Helps model to understand relationships between tokens and words, by capture sentence structure, grammar, and even long-range dependencies (subject-verb).
+Model ability to generate coherent and contextually relevant text depends on enough context, to predict next work based on input text.
+
+Prompt vs completion
+
+Temperature, top-p (conceptually)
+Temperature is used to control randomness in model performance.
+Low Temperature : Used to get precise and factual accuracy, such as technical documentation or conversational replies with chatbots.  (coherent and consistent text)
+High Temperature : Preferred to get creative outputs or creative tasks (creative writing or concept brainstorming).
+The temperature setting effectively allows users to fine-tune LLMs and adjust a model's output to their own desired outcome.
+
+
+Why hallucinations happen
+The training goal of an LLM is to always produce the most reasonable continuation of text, not necessarily the most truthful one.
+Example : "Who created Stranger Things?" - "Stranger Things was created by J.J abrams and premiered on Netflix in 2016"
+Answer sounds believable (famous director, correct streaming platform).
+
+Can't tackle hallucinations completely, we do combination of approaches to reduce it.
+We can RAG, before model answers a question or completes a task, we fetch relevant information from an external knowledge source (database) by which it doesn't solely depend on training data.
+
+Why LLMs “forget” things
+
+Because of Context window, model used transformer architecture ("self-attention") in order to attend to every token. Hence, context window got maximum set token limit by which if it exceeds the limit , old tokens get truncated (yep, model can no longer use them in chat). Sometimes, instruction overload.
+---
+
+Document Ingestion Pipeline:
+
+File parsing (PDF, TXT, Markdown)
+Text extraction libraries
+Cleaning raw data
+
+---
+
+What embeddings are (semantic meaning, not keywords)
+
+Why embeddings ≠ LLM responses
+
+Similarity search (cosine similarity, conceptually)
+
+What/Why chunking is needed
+
+Chunk size tradeoffs
+
+Vector DB (FAISS)
+
+---
+The RAG pipeline, step by step:
+
+Document ingestion
+
+Cleaning & chunking
+
+Embedding generation
+
+Vector storage
+
+Query embedding
+
+Retrieval (top-k)
+
+Context injection
+
+LLM response
+
+You should be able to draw this on paper.
+---
+
+
+
+Agentic** AI frameworks :
+crewAI , LangGraph , AutoGen (optional)
+API design (FastAPI)
+
+Database integration (SQL)
