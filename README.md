@@ -133,3 +133,4 @@ vectorstore/
 ```
 
 > Man I'm too lazy to work on UI , enjoy the colourful characters
+> Future Scope  : Will add conversation history, Multiple Documents system
