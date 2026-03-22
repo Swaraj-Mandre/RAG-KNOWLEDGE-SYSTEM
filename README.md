@@ -131,3 +131,5 @@ vectorstore/
 ├── index.faiss    ← actual vector data (embeddings)
 └── index.pkl      ← metadata & original chunk text
 ```
+
+> Man I'm too lazy to work on UI , enjoy the colourful characters
