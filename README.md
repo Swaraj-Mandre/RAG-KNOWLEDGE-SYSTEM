@@ -2,6 +2,12 @@
 
 > **An AI-powered system that answers questions using your own documents — powered by Gemini 2.5 Flash & LangChain**
 
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![Gemini](https://img.shields.io/badge/Gemini-2.5Flash-orange)
+![LangChain](https://img.shields.io/badge/LangChain-latest-green)
+![FAISS](https://img.shields.io/badge/VectorDB-FAISS-red)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
+
 ---
 
 ## What is this?
@@ -58,9 +64,11 @@ Final Answer
 | LLM | Gemini 2.5 Flash |
 | Framework | LangChain |
 | Vector Store | FAISS |
-| Embeddings | Google Generative AI |
-| Language | Python 3.11 |
-| Document Loaders | PyPDF, LangChain |
+| Embeddings | gemini-embedding-001 |
+| Language | Python 3.11.9 |
+| Document Loaders | PyPDF, TextLoader |
+
+> I used FAISS for this project as "Just pip install" "Works Offline" and most importantly "Free Forever".
 
 ---
 
@@ -70,8 +78,8 @@ Final Answer
 rag-knowledge-system/
 │
 ├── app/
-│   ├── main.py           # Entry point & LLM test
-│   ├── ingest.py         # Document loading & chunking
+│   ├── main.py           # Entry point & Gemini API test
+│   ├── ingest.py         # Document loading , chunking & FAISS storage
 │   ├── query.py          # User query interface
 │   └── rag_pipeline.py   # Full RAG pipeline
 │
@@ -79,6 +87,8 @@ rag-knowledge-system/
 │   └── documents/        # 📂 Place your documents here
 │
 ├── vectorstore/          # Auto-generated FAISS index
+│   ├── index.faiss
+│   └── index.pkl
 │
 ├── .env                  # API keys (never commit this!)
 ├── requirements.txt
@@ -121,18 +131,3 @@ vectorstore/
 ├── index.faiss    ← actual vector data (embeddings)
 └── index.pkl      ← metadata & original chunk text
 ```
-> I used FAISS for this project as "Just pip install" "Works Offline" and most importantly "Free Forever".
-
----
-
-
-## 📌 Status
-
-- [x] Project structure setup
-- [x] Gemini 2.5 Flash API connected
-- [x] Ingestion pipeline (`ingest.py`)
-- [x] Vector store setup (FAISS)
-- [ ] RAG pipeline (`rag_pipeline.py`)
-- [ ] Query interface (`query.py`)
-
----
