@@ -12,11 +12,10 @@
 
 ## What is this?
 
-This project builds a **Retrieval-Augmented Generation (RAG)** pipeline that lets you upload your own documents and ask questions about them. Instead of relying on general AI knowledge, it retrieves exact information from *your* files and generates precise answers.
+A **Retrieval-Augmented Generation (RAG)** system that lets you load your own documents and ask questions about them. Instead of relying on general AI knowledge, it retrieves exact information from *your* files and generates precise answers using Gemini 2.5 Flash.
 
 ```
-Document → Loader → Chunks → Embeddings → Vector DB → Query → Retrieve → LLM → Answer
-            (LangChain)        (FAISS)                          (Gemini 2.5 Flash)
+Your Document → Chunks → Embeddings → FAISS → Query → Retrieved Chunks → Gemini → Answer
 ```
 
 ---
@@ -59,16 +58,24 @@ Final Answer
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
+| Component | Tool |
+|-----------|------|
 | LLM | Gemini 2.5 Flash |
-| Framework | LangChain |
-| Vector Store | FAISS |
 | Embeddings | gemini-embedding-001 |
+| Framework | LangChain Classic |
+| Vector Store | FAISS (local) |
 | Language | Python 3.11.9 |
-| Document Loaders | PyPDF, TextLoader |
 
 > I used FAISS for this project as "Just pip install" "Works Offline" and most importantly "Free Forever".
+
+## Free Tier Limits (Gemini API)
+ 
+| Resource | Limit |
+|----------|-------|
+| Questions/day | 500 |
+| Questions/min | 10 |
+| Embeddings/day | 1,000 |
+| Embeddings/min | 100 |
 
 ---
 
@@ -78,19 +85,23 @@ Final Answer
 rag-knowledge-system/
 │
 ├── app/
-│   ├── main.py           # Entry point & Gemini API test
-│   ├── ingest.py         # Document loading , chunking & FAISS storage
-│   ├── query.py          # User query interface
-│   └── rag_pipeline.py   # Full RAG pipeline
+│   ├── main.py           # Gemini API connection test
+│   ├── ingest.py         # Load → Chunk → Embed → Save to FAISS
+│   ├── rag_pipeline.py   # Core RAG logic (embeddings, retriever, LLM)
+│   └── query.py          # Interactive Q&A terminal interface
+│
+├── assets/
+│   └── Demo.png
 │
 ├── data/
-│   └── documents/        # 📂 Place your documents here
+│   └── documents/        # Drop your files here (.txt .pdf .pptx .docx .jpg .png)
 │
-├── vectorstore/          # Auto-generated FAISS index
+├── vectorstore/          # Auto-created FAISS index (git ignored)
 │   ├── index.faiss
 │   └── index.pkl
 │
-├── .env                  # API keys (never commit this!)
+├── .env                  # Your API key (never commit!)
+├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
@@ -99,18 +110,16 @@ rag-knowledge-system/
 
 ##  Quick Start
 
-### 1. Create virtual environment
+### 1. Clone & setup
 ```bash
+git clone https://github.com/Swaraj-Mandre/RAG-KNOWLEDGE-SYSTEM.git
+cd RAG-KNOWLEDGE-SYSTEM
 py -3.11 -m venv venv
-venv\Scripts\activate      # Windows
-```
-
-### 2. Install dependencies
-```bash
+venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Set up API key
+### 2. Add API key
 Create a `.env` file:
 ```
 GOOGLE_API_KEY=your_gemini_api_key_here
@@ -121,10 +130,10 @@ Get your free API key at: https://aistudio.google.com/apikey
 
 > ⚠️ **Never commit your `.env` file!** It contains your API key. The `.gitignore` already excludes it.
 
-### 4. Demo Output
-![RAG Definition Output](assets/Demo.png)
+### 3. Add your documents
+Drop files into `data/documents/` — supports `.txt`, `.pdf`, `.pptx`, `.docx`, `.jpg`, `.png`
 
-### 5. Ingestion Pipeline
+### 4. Ingestion Pipeline
 Load -> Split/Chunk -> Embed -> Store
 ```
 vectorstore/
@@ -132,6 +141,9 @@ vectorstore/
 └── index.pkl      ← metadata & original chunk text
 ```
 
-> Man I'm too lazy to work on UI , enjoy the colourful characters
+### 5. Ask questions
+```bash
+python app/query.py
+```
 
-> Future Scope  : Will add conversation history, Multiple Documents system
+> Man I'm too lazy to work on UI , enjoy the colourful characters for now
