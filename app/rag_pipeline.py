@@ -25,6 +25,7 @@ Context:
 Question: {question}
 
 Answer:"""
+#We used "if" statement , however it's written in english it mirrors 'Conditional Logic'
 
 # Load Embeddings
 def load_embeddings():
@@ -42,7 +43,7 @@ def load_vector_db(embeddings, vectorstore_path="vectorstore"):
 
 # Build Retriever
 def build_retriever(vector_db, k=5):
-    return vector_db.as_retriever(search_kwargs={"k": k})
+    return vector_db.as_retriever(search_kwargs={"k": 3})
 
 # Build LLM
 def build_llm(model="gemini-2.5-flash", temperature=0.2):
@@ -50,18 +51,20 @@ def build_llm(model="gemini-2.5-flash", temperature=0.2):
         model=model,
         temperature=temperature
     )
+# 0.0 = The AI is a boring robot that never changes its answer.
+# 1.0 = The AI is a poet who might start hallucinating. 
 
 # Build RAG Chain
 def build_rag_chain(retriever, llm):
     prompt = PromptTemplate(
         template=PROMPT_TEMPLATE,
         input_variables=["context", "question"]
-    )
+    ) #telling PromptTemplate exactly which 'holes' it needs to fill
     return RetrievalQA.from_chain_type(
         llm=llm,
-        retriever=retriever,
+        retriever=retriever, #Passing llm (the brain) and retriever (the librarian)
         chain_type_kwargs={"prompt": prompt}
-    )
+    ) # 'Key : Value'
 
 # Master Function
 def initialize_pipeline(vectorstore_path="vectorstore", k=5):
@@ -87,10 +90,18 @@ def initialize_pipeline(vectorstore_path="vectorstore", k=5):
 
     return chain
 
-# Query Function
+# ── Query Function ────────────────────────────────────────
 def query_pipeline(chain, question):
     """
     Pass the chain and a question, get an answer back.
     """
-    response = chain.invoke(question)
-    return response['result']
+    try:
+        response = chain.invoke(question)  # invoke = ask
+        return response['result']
+    except Exception as e:  # noqa
+        if "quota" in str(e).lower() or "429" in str(e):  # 429 is HTTP Status code (Too Many Requests); just like 404 (not found)
+            return "API quota exceeded! Free tier limit reached. Wait a minute and try again."
+        elif "deadline" in str(e).lower() or "timeout" in str(e).lower():
+            return "Request timed out. Please try again."
+        else:
+            return f"Error generating answer: {str(e)}"

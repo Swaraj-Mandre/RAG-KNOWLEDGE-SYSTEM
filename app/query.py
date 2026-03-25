@@ -7,7 +7,7 @@ from rag_pipeline import initialize_pipeline, query_pipeline
 if __name__ == "__main__":
     chain = initialize_pipeline()
 
-    print("Ask questions about your document!")
+    print("Ask questions about your document!") #250 questions/day free (gemini-2.5-flash limit)
     print("   Type 'exit' to quit\n")
 
     while True:
