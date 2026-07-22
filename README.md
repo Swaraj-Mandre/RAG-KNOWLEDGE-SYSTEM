@@ -1,29 +1,31 @@
 # RAG Knowledge System
 
-> **An AI-powered system that answers questions using your own documents — powered by Gemini 2.5 Flash & LangChain**
+> Ask questions from your own documents. Get precise answers. No hallucinations.
 
-![Python](https://img.shields.io/badge/Python-3.11-blue)
-![Gemini](https://img.shields.io/badge/Gemini-2.5Flash-orange)
-![LangChain](https://img.shields.io/badge/LangChain-latest-green)
-![FAISS](https://img.shields.io/badge/VectorDB-FAISS-red)
-![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.11.9-blue?style=flat-square)
+![Gemini](https://img.shields.io/badge/Gemini-2.5--Flash-orange?style=flat-square)
+![LangChain](https://img.shields.io/badge/LangChain-Classic-green?style=flat-square)
+![FAISS](https://img.shields.io/badge/VectorDB-FAISS-red?style=flat-square)
+![Streamlit](https://img.shields.io/badge/UI-Streamlit-ff4b4b?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Live-brightgreen?style=flat-square)
 
----
-
-## What is this?
-
-A **Retrieval-Augmented Generation (RAG)** system that lets you load your own documents and ask questions about them. Instead of relying on general AI knowledge, it retrieves exact information from *your* files and generates precise answers using Gemini 2.5 Flash.
-
-```
-Your Document → Chunks → Embeddings → FAISS → Query → Retrieved Chunks → Gemini → Answer
-```
+**Live Demo →** [rag-knowledge-system.streamlit.app](https://rag-knowledge-system-4rxjfjre8e3dg9yqjqpubl.streamlit.app)
 
 ---
 
-## Two Pipelines Inside Every RAG System
+## What it does
 
-### A. Ingestion Pipeline *(Offline — runs once)*
+Upload any document. Ask anything about it. The system retrieves only the relevant parts and generates a grounded answer - no guessing, no hallucinations.
 
+Supports **PDF · TXT · PPTX · DOCX · JPG · PNG** out of the box.
+
+---
+
+## How it works
+
+Two pipelines run under the hood:
+
+**Ingestion** *(runs once per document)*
 ```
 Documents
    ↓
@@ -36,10 +38,9 @@ Generate Embeddings  ← Google Generative AI Embeddings
 Store in Vector DB   ← FAISS
 ```
 
-### B. Query Pipeline *(Runtime — runs on every question)*
-
+**Query** *(runs on every question)*
 ```
-User Query
+Query
    ↓
 Query Embedding         ← Same embedding model
    ↓
@@ -54,28 +55,20 @@ Gemini 2.5 Flash        ← LLM generates answer
 Final Answer 
 ```
 
+Images are processed via Gemini Vision. Everything else is handled locally — no cloud database, no extra cost.
+
 ---
 
 ## Tech Stack
 
-| Component | Tool |
-|-----------|------|
-| LLM | Gemini 2.5 Flash |
-| Embeddings | gemini-embedding-001 |
-| Framework | LangChain Classic |
-| Vector Store | FAISS (local) |
-| Language | Python 3.11.9 |
-
-> I used FAISS for this project as "Just pip install" "Works Offline" and most importantly "Free Forever".
-
-## Free Tier Limits (Gemini API)
- 
-| Resource | Limit |
-|----------|-------|
-| Questions/day | 500 |
-| Questions/min | 10 |
-| Embeddings/day | 1,000 |
-| Embeddings/min | 100 |
+| Layer | Tool | Why |
+|-------|------|-----|
+| LLM | Gemini 2.5 Flash | Best free-tier model in 2025 |
+| Embeddings | gemini-embedding-001 | Same API, zero extra setup |
+| Retrieval | FAISS | Local, offline, free forever |
+| Orchestration | LangChain Classic | Clean chain abstraction |
+| UI | Streamlit | Fast to ship, easy to deploy |
+| Language | Python 3.11.9 | Stable for all ML packages |
 
 ---
 
@@ -83,67 +76,68 @@ Final Answer
 
 ```
 rag-knowledge-system/
-│
 ├── app/
-│   ├── main.py           # Gemini API connection test
-│   ├── ingest.py         # Load → Chunk → Embed → Save to FAISS
-│   ├── rag_pipeline.py   # Core RAG logic (embeddings, retriever, LLM)
-│   └── query.py          # Interactive Q&A terminal interface
-│
+│   ├── main.py             # API connection test
+│   ├── ingest.py           # Document ingestion pipeline
+│   ├── rag_pipeline.py     # Core RAG logic
+│   ├── query.py            # Terminal interface
+│   └── streamlit_app.py    # Web UI
+├── .streamlit/
+│   └── config.toml         # Theme configuration
+├── data/documents/         # Drop files here (local use)
 ├── assets/
 │   └── Demo.png
-│
-├── data/
-│   └── documents/        # Drop your files here (.txt .pdf .pptx .docx .jpg .png)
-│
-├── vectorstore/          # Auto-created FAISS index (git ignored)
-│   ├── index.faiss
-│   └── index.pkl
-│
-├── .env                  # Your API key (never commit!)
-├── .gitignore
+├── .env                    # API key (never commit)
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-##  Quick Start
+## Run Locally
 
-### 1. Clone & setup
 ```bash
 git clone https://github.com/Swaraj-Mandre/RAG-KNOWLEDGE-SYSTEM.git
 cd RAG-KNOWLEDGE-SYSTEM
+
 py -3.11 -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Add API key
-Create a `.env` file:
+Add your API key (free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)):
 ```
-GOOGLE_API_KEY=your_gemini_api_key_here
-```
-Get your free API key at: https://aistudio.google.com/apikey
-
-## Security Note
-
-> ⚠️ **Never commit your `.env` file!** It contains your API key. The `.gitignore` already excludes it.
-
-### 3. Add your documents
-Drop files into `data/documents/` — supports `.txt`, `.pdf`, `.pptx`, `.docx`, `.jpg`, `.png`
-
-### 4. Ingestion Pipeline
-Load -> Split/Chunk -> Embed -> Store
-```
-vectorstore/
-├── index.faiss    ← actual vector data (embeddings)
-└── index.pkl      ← metadata & original chunk text
+# .env
+GOOGLE_API_KEY=your_key_here
 ```
 
-### 5. Ask questions
+Run the web app:
 ```bash
-python app/query.py
+streamlit run app/streamlit_app.py
 ```
 
-> Man I'm too lazy to work on UI , enjoy the colourful characters for now
+Or use the terminal interface:
+```bash
+python app/ingest.py   # run once per document set
+python app/query.py    # start asking questions
+```
+
+---
+
+## Free Tier Usage
+
+| Resource | Free Limit |
+|----------|-----------|
+| Questions/day | 500 |
+| Embeddings/day | 1,000 |
+| Vector storage | Unlimited (local) |
+| Infrastructure cost | ₹0 |
+
+Ingestion is a one-time cost. After that, only questions consume quota.
+
+---
+
+## Demo
+
+![Demo](assets/Demo.png)
+
