@@ -1,0 +1,33 @@
+RAG-based Knowledge System
+- Build an AI-powered system that can answer questions using your own documents
+
+Document → Document Loader → Chunk → Embedding → Vector DB → Query → Retrieve → LLM → Answer
+(LangChain)                 (FAISS)                                 (Gemini-2.5-Flash)
+Two sub-pipeline exist in every RAG System
+A. Ingestion Pipeline (offline)
+Documents → Load Documents → Chunk Documents → Generate Embedding → Store in Vector DB
+B. Query Pipeline (runtime)
+User Query → Query Embedding → Vector Similarity Search → Top Relevant chunks → Inject Context into Prompt → Gemini 2.5 Flash → Final Answer
+
+LLM APIs (gemini-2.5-flash)
+ Free Tier Limits:
+Gemini 2.5 Flash gives 10 RPM and 250 RPD with 250,000 tokens per minute.
+Embeddings give 100 RPM and 1,000 RPD for embedding calls.
+
+Token limits, prompt design
+Retrieval-Augmented Generation (RAG)
+Prompt chaining
+Summarization and question-answering
+Text chunking
+Embeddings (e.g., OpenAI text-embedding-3-small)
+Vector similarity search (cosine similarity)
+Vector databases (FAISS, Chroma, Pinecone)
+Python programming (core + API integration)
+FastAPI / Streamlit (for interface)
+JSON handling
+File I/O (PDF, TXT, DOCX parsing)
+Modular project structure
+GitHub repo organization
+
+weaviate
+AIzaSyCpxq0D6EFl9-AGtbT3DCgm4xerQUnFPAo
