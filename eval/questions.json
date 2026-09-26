@@ -1,0 +1,392 @@
+[
+  {
+    "q": "What exactly is an algorithm, and what properties must a sequence of steps satisfy to be considered an algorithm?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      3,
+      7,
+      8,
+      9
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "How do we determine whether an algorithm is correct, and what is the difference between correctness and efficiency?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      10
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "Why do we analyze time complexity instead of simply measuring execution time on a computer?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "What are best-case, average-case, and worst-case complexities, and when is each useful?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      44
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "What do Big-O, Big-Omega, and Big-Theta mean, and how are they mathematically different?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "How can you compare two functions such as n, n log n, n^2, and 2^n as input size increases?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      23
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "How do loops, nested loops, sequential statements, and conditionals contribute to an algorithm's asymptotic complexity?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      44,
+      47
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "What is the difference between polynomial-time and exponential-time algorithms, and why is this distinction important in algorithm design?",
+    "source": null,
+    "slide": null,
+    "style": "natural",
+    "note": "not found in the deck text - recheck after vision ingest"
+  },
+  {
+    "q": "What are the major algorithm design frameworks such as Divide and Conquer, Greedy, Dynamic Programming, and Backtracking?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "How do you decide which algorithm design framework is appropriate for a given problem?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "What is a recurrence relation, and why is it commonly used to analyze recursive algorithms?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      49,
+      57
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "What is the Master Theorem, what form of recurrence can it solve, and what are its major cases?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      55,
+      56,
+      57,
+      58
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "How would you analyze a recurrence such as T(n)=2T(n/2)+n using the Master Theorem, and what does the result tell you about the algorithm?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      59,
+      60
+    ],
+    "style": "natural"
+  },
+  {
+    "q": "How does Divide and Conquer work, and how is Merge Sort an example of this framework?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "Why is Merge Sort O(n log n), and why does Quick Sort have O(n log n) average time but O(n^2) worst-case time?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "What is the difference between a stable and unstable sorting algorithm, and why can stability matter?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "What is a Greedy algorithm, and what properties must a problem have for a greedy strategy to produce an optimal solution?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "Why does the greedy approach work for Activity Selection but not always for problems such as 0/1 Knapsack?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "What makes Dynamic Programming different from Divide and Conquer, and what are overlapping subproblems and optimal substructure?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "How would you identify whether a problem is suitable for Dynamic Programming?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "What is the difference between Memoization and Tabulation, and when would you use each?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "How do BFS and DFS work, and what types of problems are naturally suited to each traversal?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "How do Dijkstra's, Bellman-Ford, Prim's, and Kruskal's algorithms differ in terms of the problems they solve and their assumptions?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "What is the difference between a Minimum Spanning Tree and a Shortest Path problem?",
+    "source": null,
+    "slide": null,
+    "style": "natural",
+    "note": "trap: 'shortest path' appears on slide 12 but only as a GPS example"
+  },
+  {
+    "q": "What do P, NP, NP-Hard, and NP-Complete mean, and why is NP-Completeness important in the study of algorithms?",
+    "source": null,
+    "slide": null,
+    "style": "natural"
+  },
+  {
+    "q": "What is an algorithm? Explain its five fundamental characteristics: Input, Output, Finiteness, Definiteness, and Effectiveness.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      7,
+      8,
+      9
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "What are the expectations from a good algorithm? Explain correctness, approximation, generality, and less resource usage.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      10
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "How is the efficiency of an algorithm analyzed? Explain input size, basic operation, running time, and why the basic operation is selected.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "What are best-case, average-case, and worst-case efficiencies? Explain when they need to be considered during algorithm analysis.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      44
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "What is Order of Growth? How do you obtain the order of growth by dropping lower-order terms and constant coefficients?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      22
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "What are asymptotic notations O, Omega, Theta, little-o, and little-omega? Explain what each notation represents in terms of the growth of functions.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "Given a running-time function, how would you determine its asymptotic complexity? Solve several functions and identify their dominant terms.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "How is the time complexity of finding the largest element in an array mathematically analyzed? Identify input size, basic operation, number of executions, and final complexity.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      44,
+      45,
+      46
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "How is the Element Uniqueness problem analyzed using nested loops? Derive the number of comparisons and its order of growth.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      47,
+      48
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "What is the general procedure for analyzing a recursive algorithm? Apply the procedure to the recursive factorial algorithm.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      49,
+      50,
+      51
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "For the recursive factorial algorithm, how is the recurrence relation formed and solved using the back-substitution method? Derive its final time complexity.",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      52,
+      53,
+      54
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "What is the Master Theorem? For T(n)=aT(n/b)+f(n), how do you identify the appropriate case and determine the asymptotic solution?",
+    "source": "Updated DAA Unit 1.pptx",
+    "slide": [
+      55,
+      56,
+      57,
+      58
+    ],
+    "style": "slide-derived"
+  },
+  {
+    "q": "Who is the current CEO of Infosys?",
+    "source": null,
+    "slide": null,
+    "style": "natural",
+    "note": "plain outside-world fact"
+  },
+  {
+    "q": "What topics are covered in Unit 3 of this subject?",
+    "source": null,
+    "slide": null,
+    "style": "natural",
+    "note": "HARD: the deck has a Unit 1 syllabus slide, so retrieval looks confident"
+  },
+  {
+    "q": "When is the end semester exam for this subject?",
+    "source": null,
+    "slide": null,
+    "style": "natural",
+    "note": "administrative"
+  },
+  {
+    "q": "What is the attendance requirement to sit for the exam?",
+    "source": null,
+    "slide": null,
+    "style": "natural",
+    "note": "administrative"
+  },
+  {
+    "q": "Which programming language should I use to implement these algorithms?",
+    "source": null,
+    "slide": null,
+    "style": "natural",
+    "note": "asks for advice the slides never give"
+  }
+]
