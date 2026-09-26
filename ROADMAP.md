@@ -86,35 +86,40 @@ Key facts worth remembering:
 ## Plan
 
 ### 1. Provider layer
-- [ ] Add Mistral as the primary chat provider and Groq as fallback 1.
-- [ ] Simple fallback chain: on 429, move to the next provider/model and retry.
+- [x] Add Mistral as the primary chat provider and Groq as fallback 1.
+- [x] Simple fallback chain: on 429, move to the next provider/model and retry.
       Copy the LiteLLM *pattern* (cooldown the failed model for the day), not
       the library - roughly 30 lines and it stays readable.
-- [ ] Switch embeddings to `mistral-embed-2312`, keep Gemini as fallback.
+- [x] Switch embeddings to `mistral-embed` (the `-2312` id does not exist on the
+      free tier). Gemini stays listed but is never a live fallback: swapping
+      embedding models mid-index would corrupt it.
       Requires one full re-ingest (1024 dims vs 3072).
-- [ ] Route OCR through the Mistral OCR API, Groq `qwen3.8-27b` as fallback.
+- [x] Route image reading through Groq `qwen/qwen3.8-27b`, with Gemini as fallback.
+      Mistral's OCR API was not used - the vision chat models were enough.
 
 ### 2. Universal document loading
-- [ ] Boilerplate detection by repetition, replacing the fixed character threshold.
-- [ ] docx: raw-XML fallback when python-docx fails.
-- [ ] docx + pptx: read tables.
-- [ ] pdf: render pages to images and use vision when a page has no text.
-- [ ] Run every sample file through the loader and record what each yields.
+- [x] Boilerplate detection by repetition, replacing the fixed character threshold.
+- [x] docx: raw-XML fallback when python-docx fails.
+- [x] docx + pptx: read tables.
+- [x] pdf: render pages to images and use vision when a page has no text.
+- [x] Run every sample file through the loader and record what each yields.
 
 ### 3. Measure
-- [ ] Finish `eval/questions.json` (25 natural + 12 slide-derived + 5 out-of-doc).
-- [ ] Baseline against the text-only index.
-- [ ] Re-run after vision ingest -> before/after number on the same answer key.
-- [ ] Sweep `chunk_size` and `k`; pick values with evidence, not defaults.
+- [x] Finish `eval/questions.json` (25 natural + 12 slide-derived + 5 out-of-doc).
+- [x] Baseline against the text-only index.
+- [x] Re-run after vision ingest -> before/after number on the same answer key.
+- [x] Sweep `chunk_size` and `k`; pick values with evidence, not defaults.
 
 ### 4. Citations
-- [ ] Replace `RetrievalQA` with ~25 explicit lines returning `(answer, sources)`
+- [x] Replace `RetrievalQA` with ~25 explicit lines returning `(answer, sources)`
       and numbering the chunks, so answers cite file + slide.
-- [ ] Show sources in both the CLI and the web UI.
+- [x] Show sources in both the CLI and the web UI.
 
 ### 5. Then
 - [ ] Conversation memory (follow-ups currently fail).
-- [ ] Web fallback with honest source labelling - cheap once citations exist.
+- [x] Web fallback with honest source labelling - cheap once citations exist.
+      DuckDuckGo (no API key), snippets only, answers labelled as web-sourced
+      with links. Can be switched off with `ask(..., allow_web=False)`.
 - [ ] Cap and isolate the public demo (session-scoped index, rate limit).
 - [ ] Incremental ingest: adding one document should not re-embed everything.
 

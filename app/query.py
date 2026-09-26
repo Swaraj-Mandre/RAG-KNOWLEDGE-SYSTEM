@@ -27,10 +27,17 @@ if __name__ == "__main__":
         # Show where the answer came from, so the numbers like [1] in the
         # answer above can be checked against the real documents.
         if sources:
-            print("\nSources:")
+            # Web sources are printed with their link, so a claim from a
+            # stranger's website never looks like a claim from your own slides.
+            from_web = sources[0].get("kind") == "web"
+            print()
+            print("Sources (from the web):" if from_web else "Sources:")
             for s in sources:
-                seen_in_picture = "  (read from a picture)" if s["from_image"] else ""
-                print(f"   [{s['number']}] {s['label']}{seen_in_picture}")
+                print(f"   [{s['number']}] {s['label']}")
+                if s.get("url"):
+                    print(f"       {s['url']}")
+                elif s["from_image"]:
+                    print("       (read from a picture)")
 
 
 # Need to add "Conversation Memory" - It can't sense questions like 'Can you summarize that in 3 bullet points' 

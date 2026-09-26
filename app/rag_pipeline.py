@@ -130,6 +130,7 @@ def build_context(results):
             "label": label,
             "distance": round(float(distance), 3),
             "from_image": bool(chunk.metadata.get("from_image")),
+            "kind": "document",   # web_search.py marks its own sources "web"
         })
 
     return "\n\n".join(blocks), sources
@@ -166,8 +167,21 @@ def initialize_pipeline(vectorstore_path="vectorstore", k=5):
     return RagPipeline(vector_db, llm, k)
 
 
+def tidy_citations(text):
+    """Rewrite odd bracket styles back to plain [1].
+
+    Some models write citations with full-width CJK brackets - the answer comes
+    back saying 'Big O is a bound U+30101U+3011' instead of '[1]'. It is only a
+    display problem, but it makes the numbers look broken next to the source
+    list, so we normalise them in one place rather than nagging the prompt.
+    """
+    for left, right in (("【", "】"), ("［", "］")):
+        text = text.replace(left, "[").replace(right, "]")
+    return text
+
+
 # ── Query Function ────────────────────────────────────────
-def ask(pipeline, question):
+def ask(pipeline, question, allow_web=True):
     """Answer one question and say where the answer came from.
 
     Returns (answer, sources). `sources` is a list of dicts describing each
@@ -175,9 +189,14 @@ def ask(pipeline, question):
 
     The steps are deliberately plain:
       1. find the closest chunks, and how close each one was
-      2. if even the best one is far away, admit we do not know
+      2. if even the best one is far away, the documents cannot answer this.
+         Search the web instead - and say clearly that we did.
       3. number the chunks and paste them into the prompt
       4. ask the model, and hand back the answer plus the source list
+
+    `allow_web=False` turns step 2 back into a plain "I don't know". That
+    matters for the public demo, where we do not want every visitor's question
+    triggering an outside search.
     """
     try:
         # similarity_search_with_score gives us the DISTANCE too, which
@@ -189,9 +208,15 @@ def ask(pipeline, question):
         return friendly_error(e), []
 
     # Nothing close enough - the documents simply do not cover this.
-    # Saying so here is more reliable than hoping the model admits it,
-    # and it saves an API call.
+    #
+    # Deciding this here, from the measured distance, is more reliable than
+    # hoping the model admits it. It is also the natural place to look
+    # elsewhere: we already know the documents have nothing to offer.
     if not results or results[0][1] > RELEVANCE_LIMIT:
+        if allow_web:
+            import web_search
+            answer, web_sources = web_search.answer_from_web(pipeline.llm, question)
+            return tidy_citations(answer), web_sources
         return ("I don't have enough information in your documents to answer that.", [])
 
     # Drop the chunks that came back but are not actually close. Search always
@@ -204,7 +229,7 @@ def ask(pipeline, question):
     prompt = PROMPT_TEMPLATE.format(context=context, question=question)
 
     try:
-        return pipeline.llm.invoke(prompt).content, sources
+        return tidy_citations(pipeline.llm.invoke(prompt).content), sources
     except Exception as e:  # noqa
         return friendly_error(e), sources
 
