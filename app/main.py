@@ -1,16 +1,19 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from google import genai
+from google import genai #Google SDK (software development kit)
 
 # Load .env from project root
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=True)
+# __file__ :"The file I am currently writing in"
+# .resolve() : "real" address of the file in hard drive.
+# .parent.parent : "climbs" two folders. rather than hard coding path like "C:/Users/Documents.."
+# /".env" : 'Path' library allows us to use '/' to join folders.
 
 api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:
     raise ValueError("GOOGLE_API_KEY not found in .env")
 
-# Initialize new Gemini client
 client = genai.Client(api_key=api_key)
 
 # Test query

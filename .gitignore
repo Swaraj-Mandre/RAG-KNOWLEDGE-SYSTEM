@@ -3,3 +3,12 @@ venv/
 __pycache__/
 *.pyc
 vectorstore/
+# baseline index kept for eval before/after comparison
+vectorstore_textonly/
+.vision_cache.json
+
+# personal / college material - not for a public repo
+data/documents/SwarajMandre_Resume.pdf
+data/documents/CF FINAL REPORT.docx
+data/documents/DMV theory Assignments.pdf
+data/documents/Arduino PLC.pptx
