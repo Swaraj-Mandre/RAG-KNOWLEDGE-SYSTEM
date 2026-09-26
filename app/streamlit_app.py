@@ -2,10 +2,12 @@ import os
 import sys
 import shutil
 import tempfile
+import html
 from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
+from markdown_it import MarkdownIt
 
 sys.path.append(str(Path(__file__).resolve().parent))
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=True)
@@ -75,6 +77,25 @@ div[data-testid="stButton"]:nth-of-type(2) > button:disabled { color: #30363D; b
 .msg-ai-avatar { width: 28px; height: 28px; background: #7C3AED; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: white; flex-shrink: 0; margin-right: 10px; margin-top: 2px; }
 .msg-ai-bubble { background: #161B22; border: 1px solid #21262D; border-radius: 2px 12px 12px 12px; padding: 12px 16px; font-size: 14px; color: #C9D1D9; line-height: 1.7; word-wrap: break-word; max-width: 75%; }
 
+/* keeps converted markdown (headings, bullets, code) tight inside the bubble */
+.msg-ai-bubble p:first-child { margin-top: 0; }
+.msg-ai-bubble p:last-child { margin-bottom: 0; }
+.msg-ai-bubble ul, .msg-ai-bubble ol { margin: 8px 0; padding-left: 22px; }
+.msg-ai-bubble li { margin: 3px 0; }
+.msg-ai-bubble h1, .msg-ai-bubble h2, .msg-ai-bubble h3 { font-size: 14px; font-weight: 600; color: #E6EDF3; margin: 12px 0 6px 0; }
+.msg-ai-bubble code { background: #0D1117; border: 1px solid #21262D; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+.msg-ai-bubble pre { background: #0D1117; border: 1px solid #21262D; border-radius: 6px; padding: 10px; overflow-x: auto; }
+.msg-ai-bubble pre code { border: none; padding: 0; }
+.msg-ai-bubble table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.msg-ai-bubble th, .msg-ai-bubble td { border: 1px solid #30363D; padding: 5px 9px; text-align: left; }
+
+/* the "where this came from" list under an answer */
+.sources { margin-top: 12px; padding-top: 10px; border-top: 1px solid #21262D; }
+.sources-title { font-size: 10px; font-weight: 600; color: #484F58; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.source-item { font-size: 12px; color: #7D8590; margin: 3px 0; line-height: 1.5; }
+.source-num { color: #7C3AED; font-weight: 600; margin-right: 6px; }
+.source-tag { font-size: 10px; color: #484F58; margin-left: 6px; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse-dot { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
 .thinking-wrapper { display: flex; align-items: center; gap: 10px; padding: 12px 0; }
@@ -108,10 +129,94 @@ if "chain" not in st.session_state:
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = []
 
+# Where the searchable index lives. Written next to the project, not inside
+# app/, so running the app from any folder still finds the same one.
+VECTORSTORE = Path(__file__).resolve().parent.parent / "vectorstore"
+
+
+def load_existing_index():
+    """If documents were already indexed on a previous run, reuse that index.
+
+    Building the index is the slow and expensive part - it calls the embedding
+    service for every chunk, and the vision model for every picture. Throwing
+    that away each time the page reloads would mean re-uploading and paying for
+    it again before you could ask a single question. So we just open it.
+
+    Returns None if there is nothing saved yet, or if what is saved was built
+    by a different embedding model (initialize_pipeline refuses that case)."""
+    if not (VECTORSTORE / "index.faiss").exists():
+        return None
+    try:
+        from rag_pipeline import initialize_pipeline
+        return initialize_pipeline()
+    except Exception:
+        return None   # a stale or mismatched index - the user can rebuild it
+
+
+if st.session_state.chain is None and "tried_existing" not in st.session_state:
+    st.session_state.tried_existing = True   # only attempt this once per session
+    st.session_state.chain = load_existing_index()
+    if st.session_state.chain:
+        st.session_state.uploaded_files = ["(previously indexed documents)"]
+
+
+# Message Rendering
+# html=False -> any raw HTML the model writes gets escaped, not executed.
+# enable("table") -> markdown tables still render.
+md = MarkdownIt("commonmark", {"html": False}).enable("table")
+
+
+def render_user(text):
+    """Draw a user bubble. html.escape() so typing < or <b> shows as plain text."""
+    safe = html.escape(text)
+    st.markdown(
+        f'<div class="msg-user"><div class="msg-user-bubble">{safe}</div></div>',
+        unsafe_allow_html=True
+    )
+
+
+def render_sources(sources):
+    """Build the small "where this came from" list that sits under an answer.
+
+    The numbers here match the [1] and [2] the model wrote inside the answer,
+    so a reader can check any claim against the real slide or page instead of
+    taking the answer on trust. That is the whole point of citations."""
+    if not sources:
+        return ""   # never show an empty "Sources" heading
+    rows = []
+    for s in sources:
+        # Tell the reader when the text was read out of a picture by the vision
+        # model, because that step can misread things and is worth double-checking.
+        tag = '<span class="source-tag">read from a picture</span>' if s["from_image"] else ""
+        rows.append(
+            f'<div class="source-item">'
+            f'<span class="source-num">[{s["number"]}]</span>'
+            f'{html.escape(s["label"])}{tag}</div>'
+        )
+    return ('<div class="sources">'
+            '<div class="sources-title">Sources</div>'
+            + "".join(rows) + '</div>')
+
+
+def render_ai(text, sources=None):
+    """Draw an assistant bubble, with its sources underneath.
+
+    The answer arrives as markdown (bullets, headings), but an HTML <div> ignores
+    markdown - so convert to HTML first, else the whole answer shows as one line.
+    `sources` is optional because "I don't have enough information" has none."""
+    body = md.render(text)
+    if sources:
+        body += render_sources(sources)
+    st.markdown(
+        f'<div class="msg-ai"><div class="msg-ai-avatar">R</div><div class="msg-ai-bubble">{body}</div></div>',
+        unsafe_allow_html=True
+    )
+
+
 with st.sidebar:
     st.markdown("""
     <div class="sidebar-logo"><span class="sidebar-logo-dot"></span>RAG Knowledge System</div>
-    <div class="sidebar-version">Gemini 2.5 Flash · FAISS · LangChain</div>
+    <div class="sidebar-version">Groq · Mistral · Gemini · FAISS</div>
     """, unsafe_allow_html=True)
     st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-section">Documents</div>', unsafe_allow_html=True)
@@ -136,15 +241,26 @@ with st.sidebar:
                     f.write(file.getbuffer())
                 saved_files.append(file.name)
 
-            vectorstore_path = Path(__file__).resolve().parent.parent / "vectorstore"
-            if vectorstore_path.exists():
-                shutil.rmtree(vectorstore_path)
+            # Build the new index NEXT TO the old one, then swap.
+            #
+            # The old code deleted the index first and then started indexing.
+            # If indexing then failed halfway - a quota error is the usual
+            # reason - the working index was already gone and there was no way
+            # back. Building somewhere else first means a failure costs nothing.
+            staging = VECTORSTORE.parent / "vectorstore_building"
+            if staging.exists():
+                shutil.rmtree(staging)
 
             from ingest import ingest_documents
-            ingest_documents(documents_path=temp_dir)
+            ingest_documents(documents_path=temp_dir, vectorstore_path=str(staging))
+
+            # Indexing worked, so now it is safe to replace the old index.
+            if VECTORSTORE.exists():
+                shutil.rmtree(VECTORSTORE)
+            staging.rename(VECTORSTORE)
 
             from rag_pipeline import initialize_pipeline
-            st.session_state.chain = initialize_pipeline()
+            st.session_state.chain = initialize_pipeline(str(VECTORSTORE))
             st.session_state.uploaded_files = saved_files
             st.session_state.messages = []
             status_placeholder.markdown(f'<div class="status-ready">{len(saved_files)} file(s) ready</div>', unsafe_allow_html=True)
@@ -164,7 +280,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-footer">Free tier · 500 queries/day · Local vector storage</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-footer">Free tier · answers cite their source · local vector storage</div>', unsafe_allow_html=True)
 
 st.markdown('<p class="main-title">RAG Knowledge System</p>', unsafe_allow_html=True)
 st.markdown('<p class="main-subtitle">Upload your documents and ask anything about them.</p>', unsafe_allow_html=True)
@@ -186,16 +302,17 @@ if not st.session_state.chain and not st.session_state.messages:
 
 for message in st.session_state.messages:
     if message["role"] == "user":
-        st.markdown(f'<div class="msg-user"><div class="msg-user-bubble">{message["content"]}</div></div>', unsafe_allow_html=True)
+        render_user(message["content"])
     else:
-        st.markdown(f'<div class="msg-ai"><div class="msg-ai-avatar">R</div><div class="msg-ai-bubble">{message["content"]}</div></div>', unsafe_allow_html=True)
+        # .get() not [...] - older messages in a running session may predate sources
+        render_ai(message["content"], message.get("sources"))
 
 if prompt := st.chat_input("Ask a question about your documents..."):
     if not st.session_state.chain:
         st.warning("Upload and process your documents first.")
         st.stop()
 
-    st.markdown(f'<div class="msg-user"><div class="msg-user-bubble">{prompt}</div></div>', unsafe_allow_html=True)
+    render_user(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     thinking = st.empty()
@@ -208,11 +325,14 @@ if prompt := st.chat_input("Ask a question about your documents..."):
     """, unsafe_allow_html=True)
 
     try:
-        from rag_pipeline import query_pipeline
-        answer = query_pipeline(st.session_state.chain, prompt)
+        # ask() hands back two things: the answer, and the chunks it used.
+        from rag_pipeline import ask
+        answer, sources = ask(st.session_state.chain, prompt)
         thinking.empty()
-        st.markdown(f'<div class="msg-ai"><div class="msg-ai-avatar">R</div><div class="msg-ai-bubble">{answer}</div></div>', unsafe_allow_html=True)
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+        render_ai(answer, sources)
+        st.session_state.messages.append(
+            {"role": "assistant", "content": answer, "sources": sources}
+        )
     except Exception as e:
         thinking.empty()
         st.error(f"Error: {str(e)}")
