@@ -5,8 +5,8 @@ secondaryBackgroundColor = "#161B22"
 textColor = "#E6EDF3"
 primaryColor = "#7C3AED"
 
-[ui]
-hideSidebarNav = true
+# [ui] hideSidebarNav was removed from Streamlit and now only prints a warning
+# on every start, so it is gone. The app has no extra pages for a nav to show.
 
 [server]
 # Streamlit otherwise advertises "200MB per file" in the upload box, which

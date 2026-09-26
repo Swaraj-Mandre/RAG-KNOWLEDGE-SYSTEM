@@ -10,14 +10,16 @@ markdown-it-py==4.0.0        # renders the model's markdown answers as HTML
 python-dotenv==1.2.2         # reads GOOGLE_API_KEY from .env
 
 # LangChain core
-langchain-core==1.2.19
+langchain-core==1.6.5
 langchain-community==0.4.1        # TextLoader, FAISS wrapper
 langchain-text-splitters==1.1.1   # RecursiveCharacterTextSplitter
-langchain-classic==1.0.3          # RetrievalQA, PromptTemplate
 
-# Google / Gemini
-langchain-google-genai==4.2.1     # ChatGoogleGenerativeAI + embeddings
-google-genai==1.67.0              # direct SDK, used for image OCR in ingest.py
+# The three chat/embedding providers. providers.py imports all three and falls
+# back down the list when one runs out of free quota, so all three are needed
+# even though only one answers any given question.
+langchain-groq==1.1.3             # Groq: gpt-oss-120b chat, qwen vision
+langchain-mistralai==1.1.6        # Mistral: chat + mistral-embed embeddings
+langchain-google-genai==4.2.1     # Gemini: chat + vision fallback
 
 # Vector store
 faiss-cpu==1.13.2
@@ -26,4 +28,4 @@ faiss-cpu==1.13.2
 pymupdf==1.28.0              # PDF  (imported as "fitz")
 python-pptx==1.0.2           # PPTX
 python-docx==1.2.0           # DOCX
-ddgs>=9.0
+ddgs==9.16.0                 # DuckDuckGo search, no API key needed

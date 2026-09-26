@@ -38,7 +38,20 @@ from pathlib import Path
 # locally behaves exactly as it always has: no caps, your own documents loaded.
 # On the public deployment we set DEMO_MODE=1.
 def demo_mode():
-    return os.getenv("DEMO_MODE", "").strip().lower() in ("1", "true", "yes", "on")
+    setting = os.getenv("DEMO_MODE", "")
+
+    # On Streamlit Community Cloud there is no .env file and no environment
+    # variable: settings are pasted into a box and arrive as st.secrets. This
+    # check has to work before providers.py has been imported, so it looks for
+    # itself rather than relying on that module to have copied things across.
+    if not setting:
+        try:
+            import streamlit as st
+            setting = str(st.secrets.get("DEMO_MODE", ""))
+        except Exception:
+            setting = ""      # not hosted, or no secrets set - plainly not a demo
+
+    return setting.strip().lower() in ("1", "true", "yes", "on")
 
 
 # ---- What a visitor may upload -----------------------------------------

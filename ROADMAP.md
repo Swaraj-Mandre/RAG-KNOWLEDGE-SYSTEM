@@ -129,6 +129,7 @@ Key facts worth remembering:
       after 2 hours. Caps on files, size, vision calls, questions per visit
       and questions per day. Set DEMO_MODE=1 to switch all of it on.
 - [ ] Incremental ingest: adding one document should not re-embed everything.
+      (Local convenience only - the demo builds a fresh index per visitor.)
 
 ---
 

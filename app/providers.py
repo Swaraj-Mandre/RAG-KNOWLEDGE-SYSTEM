@@ -28,6 +28,33 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=True)
 
 
+def load_hosted_secrets():
+    """Copy Streamlit Cloud's secrets into the environment.
+
+    On your own machine the API keys come from the .env file, read above. When
+    the app is hosted on Streamlit Community Cloud there is no .env - you paste
+    the keys into a settings box instead, and Streamlit hands them over as
+    st.secrets rather than as environment variables. os.getenv would simply
+    return None and every provider would look unavailable.
+
+    So we copy them across once, at import time. Everything below this line can
+    then keep using os.getenv and does not need to know where it is running.
+
+    Wrapped in try/except because streamlit is not installed when this module is
+    used from the command line, and there is nothing to copy in that case.
+    """
+    try:
+        import streamlit as st
+        for name in ("GROQ_API_KEY", "MISTRAL_API_KEY", "GOOGLE_API_KEY", "DEMO_MODE"):
+            if name not in os.environ and name in st.secrets:
+                os.environ[name] = str(st.secrets[name])
+    except Exception:
+        pass    # not running under Streamlit, or no secrets configured
+
+
+load_hosted_secrets()
+
+
 # Chat models, in the order we try them.
 #
 # The order is deliberate: strongest model first, most generous model last.
