@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -177,11 +178,16 @@ def tidy_citations(text):
     """
     for left, right in (("【", "】"), ("［", "］")):
         text = text.replace(left, "[").replace(right, "]")
+
+    # Some models also tack an internal reference onto the number, writing
+    # "[1†55]" instead of "[1]". Keep the number, drop the rest, so the
+    # citation still lines up with the source list underneath.
+    text = re.sub(r"\[(\d+)[†‡#][^\]]*\]", r"[\1]", text)
     return text
 
 
 # ── Query Function ────────────────────────────────────────
-def ask(pipeline, question, allow_web=True):
+def ask(pipeline, question, history=None, allow_web=True):
     """Answer one question and say where the answer came from.
 
     Returns (answer, sources). `sources` is a list of dicts describing each
@@ -194,15 +200,27 @@ def ask(pipeline, question, allow_web=True):
       3. number the chunks and paste them into the prompt
       4. ask the model, and hand back the answer plus the source list
 
+    `history` is the last few turns of the chat, as (question, answer) pairs.
+    When it is given, a follow-up like "summarize that" is first rewritten into
+    a question that stands on its own - see conversation.py for why that is
+    necessary before searching.
+
     `allow_web=False` turns step 2 back into a plain "I don't know". That
     matters for the public demo, where we do not want every visitor's question
     triggering an outside search.
     """
+    # What the user typed stays untouched for display; `lookup` is the version
+    # we actually search with. They differ only for follow-up questions.
+    lookup = question
+    if history:
+        import conversation
+        lookup = conversation.standalone_question(pipeline.llm, history, question)
+
     try:
         # similarity_search_with_score gives us the DISTANCE too, which
         # as_retriever() hides. We need it for the check in step 2.
         results = pipeline.vector_db.similarity_search_with_score(
-            question, k=pipeline.k
+            lookup, k=pipeline.k
         )
     except Exception as e:
         return friendly_error(e), []
@@ -215,7 +233,7 @@ def ask(pipeline, question, allow_web=True):
     if not results or results[0][1] > RELEVANCE_LIMIT:
         if allow_web:
             import web_search
-            answer, web_sources = web_search.answer_from_web(pipeline.llm, question)
+            answer, web_sources = web_search.answer_from_web(pipeline.llm, lookup)
             return tidy_citations(answer), web_sources
         return ("I don't have enough information in your documents to answer that.", [])
 
@@ -226,7 +244,7 @@ def ask(pipeline, question, allow_web=True):
     close_enough = [row for row in results if row[1] <= RELEVANCE_LIMIT]
 
     context, sources = build_context(close_enough)
-    prompt = PROMPT_TEMPLATE.format(context=context, question=question)
+    prompt = PROMPT_TEMPLATE.format(context=context, question=lookup)
 
     try:
         return tidy_citations(pipeline.llm.invoke(prompt).content), sources

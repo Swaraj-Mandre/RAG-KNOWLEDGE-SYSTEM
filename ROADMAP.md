@@ -116,7 +116,10 @@ Key facts worth remembering:
 - [x] Show sources in both the CLI and the web UI.
 
 ### 5. Then
-- [ ] Conversation memory (follow-ups currently fail).
+- [x] Conversation memory (follow-ups currently fail).
+      Last 3 turns kept. A follow-up is rewritten into a standalone question
+      before searching, but only when a cheap word check says it needs it -
+      so a normal question still costs one API call, not two.
 - [x] Web fallback with honest source labelling - cheap once citations exist.
       DuckDuckGo (no API key), snippets only, answers labelled as web-sourced
       with links. Can be switched off with `ask(..., allow_web=False)`.

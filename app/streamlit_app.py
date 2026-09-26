@@ -353,9 +353,20 @@ if prompt := st.chat_input("Ask a question about your documents..."):
     """, unsafe_allow_html=True)
 
     try:
+        # Turn the stored chat into (question, answer) pairs so a follow-up
+        # like "summarize that" knows what it refers to. We only send the last
+        # few turns - conversation.py trims them.
+        from conversation import MAX_TURNS
+        past = st.session_state.messages[:-1]          # drop the question just asked
+        history = [
+            (past[i]["content"], past[i + 1]["content"])
+            for i in range(0, len(past) - 1, 2)
+            if past[i]["role"] == "user" and past[i + 1]["role"] == "assistant"
+        ][-MAX_TURNS:]
+
         # ask() hands back two things: the answer, and the chunks it used.
         from rag_pipeline import ask
-        answer, sources = ask(st.session_state.chain, prompt)
+        answer, sources = ask(st.session_state.chain, prompt, history=history)
         thinking.empty()
         render_ai(answer, sources)
         st.session_state.messages.append(
