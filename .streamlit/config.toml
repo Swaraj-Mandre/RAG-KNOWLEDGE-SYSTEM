@@ -7,3 +7,11 @@ primaryColor = "#7C3AED"
 
 [ui]
 hideSidebarNav = true
+
+[server]
+# Streamlit otherwise advertises "200MB per file" in the upload box, which
+# contradicts the 10 MB cap in app/limits.py - a visitor would upload a large
+# file, wait, and only then be refused. Setting it here makes the widget itself
+# show and enforce the real number. The largest sample document in this project
+# is about 3.6 MB, so 10 MB is comfortable.
+maxUploadSize = 10

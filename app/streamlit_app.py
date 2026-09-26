@@ -135,9 +135,27 @@ if "chain" not in st.session_state:
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = []
 
-# Where the searchable index lives. Written next to the project, not inside
-# app/, so running the app from any folder still finds the same one.
-VECTORSTORE = Path(__file__).resolve().parent.parent / "vectorstore"
+import limits
+
+DEMO = limits.demo_mode()
+
+# Where this browser tab's searchable index lives.
+#
+# On your own machine there is one index, kept next to the project, and it is
+# reused every time you open the app.
+#
+# On the public demo that would be wrong and unsafe: everyone would share one
+# index, so a question typed by one visitor would search a document uploaded by
+# a different visitor. Their CV, their report, their invoice. So in demo mode
+# every browser tab gets its own private folder with a random name, and stale
+# folders are swept away after a couple of hours.
+if DEMO:
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = limits.new_session_id()
+        limits.cleanup_old_sessions()     # tidy up whoever left before us
+    VECTORSTORE = limits.session_dir(st.session_state.session_id)
+else:
+    VECTORSTORE = Path(__file__).resolve().parent.parent / "vectorstore"
 
 
 def load_existing_index():
@@ -150,11 +168,15 @@ def load_existing_index():
 
     Returns None if there is nothing saved yet, or if what is saved was built
     by a different embedding model (initialize_pipeline refuses that case)."""
+    # Never on the public demo. There, an existing index belongs either to the
+    # owner of the project or to another visitor, and neither is ours to open.
+    if DEMO:
+        return None
     if not (VECTORSTORE / "index.faiss").exists():
         return None
     try:
         from rag_pipeline import initialize_pipeline
-        return initialize_pipeline()
+        return initialize_pipeline(str(VECTORSTORE))
     except Exception:
         return None   # a stale or mismatched index - the user can rebuild it
 
@@ -258,9 +280,22 @@ with st.sidebar:
     )
 
     if st.button("Process documents", disabled=not bool(uploaded), key="process_btn"):
+        # On the public demo, check the upload before spending anything on it.
+        # Refusing a 200 MB file costs nothing; embedding one costs the whole
+        # day's budget.
+        allowed, why_not = (True, "") if not DEMO else limits.check_upload(uploaded)
+        if not allowed:
+            st.warning(why_not)
+            st.stop()
+
         status_placeholder = st.empty()
         status_placeholder.markdown('<div class="status-processing"><span class="status-dot"></span>Ingesting documents...</div>', unsafe_allow_html=True)
         try:
+            # Cap how many pictures the vision model may read for this visitor.
+            # None means no cap, which is what you get on your own machine.
+            from ingest import set_vision_budget
+            set_vision_budget(limits.MAX_VISION_IMAGES if DEMO else None)
+
             temp_dir = tempfile.mkdtemp()
             saved_files = []
             for file in uploaded:
@@ -275,7 +310,10 @@ with st.sidebar:
             # If indexing then failed halfway - a quota error is the usual
             # reason - the working index was already gone and there was no way
             # back. Building somewhere else first means a failure costs nothing.
-            staging = VECTORSTORE.parent / "vectorstore_building"
+            # Named after this visitor's own folder, not a fixed name: two
+            # people uploading at the same moment must not share a staging
+            # directory, or each would overwrite the other's half-built index.
+            staging = VECTORSTORE.parent / (VECTORSTORE.name + "_building")
             if staging.exists():
                 shutil.rmtree(staging)
 
@@ -308,7 +346,25 @@ with st.sidebar:
         st.rerun()
 
     st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-footer">Free tier · answers cite their source · local vector storage</div>', unsafe_allow_html=True)
+
+    if DEMO:
+        # Say the limits out loud. A visitor who knows there are 15 questions
+        # spends them well; one who finds out by being cut off just leaves.
+        asked_now = sum(1 for m in st.session_state.messages if m["role"] == "user")
+        left = max(0, limits.MAX_QUESTIONS_PER_SESSION - asked_now)
+        used_today, per_day = limits.questions_today()
+        st.markdown(
+            f'<div class="sidebar-section">Demo limits</div>'
+            f'<div class="sidebar-footer">'
+            f'{left} of {limits.MAX_QUESTIONS_PER_SESSION} questions left this visit<br>'
+            f'up to {limits.MAX_FILES} files, {limits.MAX_FILE_MB} MB each<br>'
+            f'{used_today} of {per_day} questions used today<br><br>'
+            f'Your documents stay in your own session and are deleted '
+            f'automatically. Run it yourself with your own keys - see the README.'
+            f'</div>',
+            unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="sidebar-footer">Free tier · answers cite their source · local vector storage</div>', unsafe_allow_html=True)
 
 st.markdown('<p class="main-title">RAG Knowledge System</p>', unsafe_allow_html=True)
 st.markdown('<p class="main-subtitle">Upload your documents and ask anything about them.</p>', unsafe_allow_html=True)
@@ -339,6 +395,16 @@ if prompt := st.chat_input("Ask a question about your documents..."):
     if not st.session_state.chain:
         st.warning("Upload and process your documents first.")
         st.stop()
+
+    # On the public demo, check the caps before anything is spent. asked is the
+    # number of questions this visitor has already put to the app.
+    if DEMO:
+        asked = sum(1 for m in st.session_state.messages if m["role"] == "user")
+        allowed, why_not = limits.check_question(prompt, asked)
+        if not allowed:
+            st.warning(why_not)
+            st.stop()
+        limits.record_question()   # counts towards today's shared total
 
     render_user(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})

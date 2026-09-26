@@ -53,6 +53,22 @@ def vision_cache():
     return _cache
 
 
+# How many pictures we are still allowed to read on this run.
+# None means "no limit", which is what you want on your own machine.
+# The public demo sets a number, so one visitor cannot spend the whole day's
+# vision budget on a single 200-slide deck.
+_vision_budget = None
+_vision_used = 0
+
+
+def set_vision_budget(limit):
+    """Allow only `limit` pictures to be read from here on. Pass None for no
+    limit. Call this before ingest_documents()."""
+    global _vision_budget, _vision_used
+    _vision_budget = limit
+    _vision_used = 0
+
+
 def describe_image(image_bytes, mime="image/png"):
     """Read the text out of a picture and return it.
 
@@ -68,6 +84,16 @@ def describe_image(image_bytes, mime="image/png"):
 
     if cache.get(key):
         return cache[key]
+
+    # Reading a picture is the most expensive thing this project does, so on the
+    # public demo we allow only a fixed number per visitor. A cached picture
+    # never counts, because it costs nothing. Running out is not an error: we
+    # return empty text and the slide is simply indexed without its picture.
+    global _vision_used
+    if _vision_budget is not None:
+        if _vision_used >= _vision_budget:
+            return ""
+        _vision_used += 1
 
     text = providers.read_image(image_bytes, mime)
     if text:

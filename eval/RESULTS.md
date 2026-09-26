@@ -144,3 +144,55 @@ bookkeeping error, not evidence that retrieval was matching words instead of
 meaning. It is a good reminder that an eval is only ever as trustworthy as its
 answer key, and that a number moving in the direction you hoped for is a reason
 to check it harder, not to celebrate.
+
+---
+
+## The distance threshold does not transfer between documents
+
+The measurements above produced a clean split on the DAA deck: correct answers
+sat at 0.18-0.35, unanswerable questions at 0.37 and above. A cutoff of 0.36
+separated them perfectly, and the pipeline used it to decide when to say "I
+don't have enough information".
+
+While hardening the public demo, that cutoff was tested against a document it
+had never seen - a short personal note holding a name, an address, a bank
+account number and a medical detail:
+
+| question the note CAN answer | distance | verdict at 0.36 |
+|---|---|---|
+| What is the bank account number? | 0.533 | refused |
+| Who is this record about? | 0.553 | refused |
+| What is Priya Sharma allergic to? | 0.405 | refused |
+| What is the home address? | 0.589 | refused |
+
+Every single one was refused, with the answer sitting in the retrieved chunk.
+
+### Why
+
+The slides are topical - one slide is about one idea, so a question about that
+idea matches the whole chunk closely. The note is the opposite: four unrelated
+facts share one chunk, so a question about any one of them matches only a
+fraction of it and the distance rises. Nothing was wrong with retrieval; the
+right chunk was returned first every time. The cutoff was wrong.
+
+**0.36 was never a property of the embedding model. It was a property of that
+deck.** Publishing it as a threshold was the mistake, and it only surfaced
+because the demo lets visitors upload documents nobody has seen before.
+
+### What replaced it
+
+- `FAR_LIMIT = 0.75` - loose enough to be a filter for nonsense rather than a
+  judge. Past it, nothing retrieved is plausibly related, so we skip the model
+  call and go to the web.
+- `SPREAD = 0.12` - keep the best chunk and anything nearly as good. Relative to
+  whatever came back, so it adapts to the document.
+- The model decides the rest. It reads the chunks and replies with a fixed
+  sentinel when they do not answer the question, which the pipeline treats
+  exactly like finding nothing.
+
+This costs one extra model call for a question the documents cannot answer,
+which the old cutoff avoided. That is a fair price for not refusing questions
+that the documents clearly do answer.
+
+The retrieval numbers higher up this page are unaffected - they measure which
+chunks come back, not what is done with them afterwards.

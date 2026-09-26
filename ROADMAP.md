@@ -123,7 +123,11 @@ Key facts worth remembering:
 - [x] Web fallback with honest source labelling - cheap once citations exist.
       DuckDuckGo (no API key), snippets only, answers labelled as web-sourced
       with links. Can be switched off with `ask(..., allow_web=False)`.
-- [ ] Cap and isolate the public demo (session-scoped index, rate limit).
+- [x] Cap and isolate the public demo (session-scoped index, rate limit).
+      Uploads stay ON - a visitor only trusts the answers when the document
+      is one they wrote. Each visitor gets a private index folder, swept
+      after 2 hours. Caps on files, size, vision calls, questions per visit
+      and questions per day. Set DEMO_MODE=1 to switch all of it on.
 - [ ] Incremental ingest: adding one document should not re-embed everything.
 
 ---

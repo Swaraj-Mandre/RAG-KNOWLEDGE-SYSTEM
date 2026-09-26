@@ -19,7 +19,9 @@ Answer the user's question based on the context provided.
 - If asked for topics/headings, list them all
 - If asked a specific question, answer specifically
 - Use bullet points, headings, and examples where helpful
-- If the answer is truly not in the context, say "I don't have enough information"
+- If the context does not answer the question, reply with exactly NOT_IN_DOCUMENTS
+  and nothing else. Do not guess, and do not answer from your own knowledge.
+  This is important: it is how the system knows to go and look elsewhere.
 
 Every chunk below is numbered. After each fact you state, put the number of the
 chunk it came from in square brackets, like [1] or [2][3]. Do not cite a number
@@ -45,6 +47,36 @@ Answer:"""
 # So anything past ~0.36 is almost certainly not covered by the documents, and
 # we say so instead of letting the model invent an answer.
 RELEVANCE_LIMIT = 0.36
+
+# ...but that number turned out to be true for THAT deck, not for documents in
+# general, and it is worth understanding why before trusting any such number.
+#
+# The slides are topical: one slide is about Big Omega, so a question about Big
+# Omega matches it closely. Now upload a one-page note holding a name, an
+# address, an account number and a medical detail all together. A question
+# about any single field only partly matches the chunk as a whole, and measured
+# distances came back between 0.40 and 0.59 - every one of them past 0.36, so
+# every one would be refused even though the answer was sitting right there.
+#
+# Since visitors upload documents we have never seen, a fixed cutoff tuned on
+# one deck is the wrong tool. So we use two much weaker rules instead:
+#
+#   FAR_LIMIT   - past this, nothing retrieved is plausibly related, so we can
+#                 skip the model entirely and go straight to the web. It is set
+#                 loose on purpose; it is a filter for nonsense, not a judge.
+#   SPREAD      - having found the best chunk, keep the others that are nearly
+#                 as good and drop the rest. This is relative, so it adapts to
+#                 whatever the document happens to be.
+#
+# Anything in between is decided by the model, which can actually read the text
+# and tell whether it answers the question. See NOT_IN_DOCUMENTS below.
+FAR_LIMIT = 0.75
+SPREAD = 0.12
+
+# The exact words the model is told to reply with when the chunks do not answer
+# the question. Asking for a fixed string, rather than trying to guess from
+# phrasing, means we can detect it reliably and go and search the web instead.
+NOT_IN_DOCUMENTS = "NOT_IN_DOCUMENTS"
 
 # Load Embeddings
 def load_embeddings():
@@ -225,31 +257,42 @@ def ask(pipeline, question, history=None, allow_web=True):
     except Exception as e:
         return friendly_error(e), []
 
-    # Nothing close enough - the documents simply do not cover this.
-    #
-    # Deciding this here, from the measured distance, is more reliable than
-    # hoping the model admits it. It is also the natural place to look
-    # elsewhere: we already know the documents have nothing to offer.
-    if not results or results[0][1] > RELEVANCE_LIMIT:
-        if allow_web:
-            import web_search
-            answer, web_sources = web_search.answer_from_web(pipeline.llm, lookup)
-            return tidy_citations(answer), web_sources
-        return ("I don't have enough information in your documents to answer that.", [])
+    # Nothing even vaguely related came back, so there is no point paying for a
+    # model call to confirm it. Go straight to the web.
+    if not results or results[0][1] > FAR_LIMIT:
+        return elsewhere(pipeline, lookup, allow_web)
 
-    # Drop the chunks that came back but are not actually close. Search always
-    # returns k results even when only two of them are relevant, and feeding
-    # the far ones to the model just invites it to cite something unrelated.
-    # Safe to cut here: the eval showed correct chunks never exceeded 0.35.
-    close_enough = [row for row in results if row[1] <= RELEVANCE_LIMIT]
+    # Keep the best chunk and anything nearly as good, then stop. Measuring
+    # from the best result rather than from a fixed number is what lets this
+    # work on a document we have never seen: if the best match sits at 0.50,
+    # chunks at 0.55 are still worth reading, and chunks at 0.70 are not.
+    best = results[0][1]
+    close_enough = [row for row in results if row[1] <= best + SPREAD]
 
     context, sources = build_context(close_enough)
     prompt = PROMPT_TEMPLATE.format(context=context, question=lookup)
 
     try:
-        return tidy_citations(pipeline.llm.invoke(prompt).content), sources
+        answer = pipeline.llm.invoke(prompt).content
     except Exception as e:  # noqa
         return friendly_error(e), sources
+
+    # The model has now read the chunks and says they do not answer the
+    # question. It is a better judge of that than a distance ever was, because
+    # it can actually read the words. Treat it exactly like finding nothing.
+    if NOT_IN_DOCUMENTS in answer:
+        return elsewhere(pipeline, lookup, allow_web)
+
+    return tidy_citations(answer), sources
+
+
+def elsewhere(pipeline, question, allow_web):
+    """The documents cannot answer this. Search the web, or say so honestly."""
+    if allow_web:
+        import web_search
+        answer, web_sources = web_search.answer_from_web(pipeline.llm, question)
+        return tidy_citations(answer), web_sources
+    return ("I don't have enough information in your documents to answer that.", [])
 
 
 def friendly_error(e):
