@@ -127,6 +127,28 @@ def make_embeddings(spec):
 
 
 # What the rest of the app calls
+def missing_keys_message(needed):
+    """Explain a missing key in terms of where the app is actually running.
+
+    Saying "not found in .env" is wrong and confusing on a hosted deployment,
+    where there is no .env file at all and the keys come from a settings box.
+    Whoever reads this message needs to know which box to go and fill in.
+    """
+    try:
+        import streamlit as st
+        hosted = bool(st.secrets)     # raises or is empty when running locally
+    except Exception:
+        hosted = False
+
+    if hosted:
+        return (f"No API key found. Add {needed} in this app's "
+                f"Settings -> Secrets on Streamlit Cloud, in the form "
+                f'KEY = "value", then reboot the app.')
+
+    return (f"No API key found in .env - it needs {needed}. "
+            f"The .env file goes in the project root, next to requirements.txt.")
+
+
 def build_chat_model(temperature=0.2):
     """Build the chat model, with every other model in the list as a backup.
 
@@ -137,8 +159,8 @@ def build_chat_model(temperature=0.2):
     """
     choices = usable(CHAT_MODELS)
     if not choices:
-        raise ValueError("No chat API key found in .env "
-                         "(need MISTRAL_API_KEY, GROQ_API_KEY or GOOGLE_API_KEY)")
+        raise ValueError(missing_keys_message(
+            "GROQ_API_KEY, MISTRAL_API_KEY or GOOGLE_API_KEY"))
 
     models = [make_chat_model(spec, temperature) for spec in choices]
     first = choices[0]
@@ -158,8 +180,8 @@ def build_embeddings():
     """
     choices = usable(EMBEDDING_MODELS)
     if not choices:
-        raise ValueError("No embedding API key found in .env "
-                         "(need MISTRAL_API_KEY or GOOGLE_API_KEY)")
+        raise ValueError(missing_keys_message(
+            "MISTRAL_API_KEY or GOOGLE_API_KEY"))
 
     spec = choices[0]
     print(f"   Embeddings: {spec['service']}/{spec['model']}  "
@@ -222,7 +244,7 @@ def read_image(image_bytes, mime="image/png", prompt=READ_IMAGE_PROMPT):
 
     choices = usable(VISION_MODELS)
     if not choices:
-        raise ValueError("No vision API key found in .env")
+        raise ValueError(missing_keys_message("GROQ_API_KEY or GOOGLE_API_KEY"))
 
     last_error = None
     for spec in choices:

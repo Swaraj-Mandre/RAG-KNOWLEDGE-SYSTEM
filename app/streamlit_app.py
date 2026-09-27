@@ -137,6 +137,14 @@ if "uploaded_files" not in st.session_state:
 
 import limits
 
+# Imported early, and deliberately so. Importing providers is what copies the
+# keys out of Streamlit Cloud's secrets box into the environment, and the
+# sidebar below reports which keys were found. If this import happened later -
+# inside the Process button, where it used to - the sidebar would say no keys
+# exist on a perfectly working deployment. The module itself is cheap: it pulls
+# in langchain only inside the functions that need it.
+import providers  # noqa: F401  (imported for its startup side effect)
+
 DEMO = limits.demo_mode()
 
 # Where this browser tab's searchable index lives.
@@ -269,6 +277,24 @@ with st.sidebar:
     <div class="sidebar-version">Groq · Mistral · Gemini · FAISS</div>
     """, unsafe_allow_html=True)
     st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+
+    # Show which API keys the app can actually see. Without this, a missing key
+    # only shows up as a failure in the middle of processing a document, long
+    # after you have waited - and it looks like the document was the problem.
+    import os as _os
+    found = [name for name in ("GROQ_API_KEY", "MISTRAL_API_KEY", "GOOGLE_API_KEY")
+             if _os.getenv(name)]
+    if not found:
+        st.error(
+            "No API keys found.\n\n"
+            "Hosted on Streamlit Cloud: open Manage app - Settings - Secrets and "
+            'add them as KEY = "value", then reboot.\n\n'
+            "Running locally: put them in a .env file in the project root."
+        )
+    elif len(found) < 3:
+        st.caption(f"{len(found)} of 3 providers available - "
+                   f"fewer backups when one runs out of free quota.")
+
     st.markdown('<div class="sidebar-section">Documents</div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-hint">PDF · TXT · PPTX · DOCX · JPG · PNG</div>', unsafe_allow_html=True)
 
