@@ -200,6 +200,112 @@ def initialize_pipeline(vectorstore_path="vectorstore", k=5):
     return RagPipeline(vector_db, llm, k)
 
 
+# Asking for a summary is not a search, and treating it as one fails badly.
+#
+# Searching works by finding chunks that resemble the question. "Summarize this
+# document" does not resemble any particular slide, so the search returns
+# whatever happens to be nearest, decides the document cannot answer, and goes
+# off to the web - which is how "summarize this ppt" came back with links to
+# online PPT summarising tools instead of a summary.
+#
+# A summary needs the opposite of a search: a spread of the whole document
+# rather than the few parts nearest to a phrase.
+SUMMARY_PHRASES = (
+    "summar", "overview", "outline", "tl;dr", "tldr", "the gist",
+    "key points", "main points", "key topics", "main topics", "main ideas",
+    "what is this document", "what is this ppt", "what is this file",
+    "what is it about", "what's it about", "what is this about",
+    "brief me", "in short", "cover", "contents of",
+)
+
+# Words that show the question is about the reader's OWN uploaded files. When
+# one of these appears, searching the web instead would be plainly wrong, no
+# matter how poorly the search went.
+OWN_DOCUMENT_PHRASES = (
+    "this ppt", "this pptx", "this document", "this doc", "this file",
+    "this pdf", "this deck", "this slide", "these slides", "this presentation",
+    "this report", "the document", "the ppt", "the pdf", "the file", "the deck",
+    "my document", "my ppt", "my pdf", "my file", "my slides", "my deck",
+    "uploaded", "attached",
+)
+
+# How many pieces of the document to read when writing a summary. Enough to
+# cover the whole thing, small enough to fit comfortably in one prompt.
+SUMMARY_CHUNKS = 12
+
+
+def wants_summary(question):
+    """True when the question asks about the document as a whole."""
+    text = question.lower()
+    return any(phrase in text for phrase in SUMMARY_PHRASES)
+
+
+def about_own_documents(question):
+    """True when the question clearly refers to the reader's own files."""
+    text = question.lower()
+    return any(phrase in text for phrase in OWN_DOCUMENT_PHRASES)
+
+
+# Words a person uses to mean a particular kind of file, and the file endings
+# they correspond to. Used to narrow a summary when several documents are
+# indexed at once: "summarize this ppt" should not summarise your CV as well.
+FILE_KINDS = {
+    (".pptx", ".ppt"): ("ppt", "pptx", "slide", "deck", "presentation"),
+    (".pdf",):         ("pdf",),
+    (".docx", ".doc"): ("docx", "word document", "word file", "report"),
+    (".txt",):         ("txt", "text file", "notes"),
+}
+
+
+def narrow_to_named_file(chunks, question):
+    """Keep only the chunks from the file the question is talking about.
+
+    With one document indexed this changes nothing. With several, it is the
+    difference between a useful answer and a muddle: asking about "this ppt"
+    while a CV and a PDF are also indexed should not pull those in.
+
+    We look for a file kind ("ppt", "pdf") in the question. If nothing matches,
+    or the match would leave us with nothing, we keep everything - guessing
+    wrong should never lose the reader their answer.
+    """
+    text = question.lower()
+
+    for endings, words in FILE_KINDS.items():
+        if not any(word in text for word in words):
+            continue
+        kept = [c for c in chunks
+                if str(c.metadata.get("source", "")).lower().endswith(endings)]
+        if kept:
+            return kept
+
+    return chunks
+
+
+def spread_of_document(vector_db, limit=SUMMARY_CHUNKS, question=""):
+    """Take pieces from across the whole document, evenly spaced.
+
+    Chunks are stored in the order they were read, so walking the list at even
+    intervals gives the beginning, the middle and the end rather than whatever
+    happened to sit nearest one phrase. That is what a summary needs.
+
+    Returns the same (chunk, distance) shape the search returns, so the rest of
+    the pipeline does not need a special case. The distance is recorded as 0
+    because nothing was measured - these were chosen by position, not by
+    similarity.
+    """
+    chunks = list(vector_db.docstore._dict.values())
+    if not chunks:
+        return []
+
+    chunks = narrow_to_named_file(chunks, question)
+
+    if len(chunks) <= limit:
+        return [(chunk, 0.0) for chunk in chunks]
+
+    step = len(chunks) / limit
+    return [(chunks[int(i * step)], 0.0) for i in range(limit)]
+
+
 def tidy_citations(text):
     """Rewrite odd bracket styles back to plain [1].
 
@@ -248,14 +354,35 @@ def ask(pipeline, question, history=None, allow_web=True):
         import conversation
         lookup = conversation.standalone_question(pipeline.llm, history, question)
 
+    # Someone asking about "this ppt" wants an answer from their own upload.
+    # Answering from the web would be wrong even if the search went badly, so
+    # the web door is closed for this question before anything else happens.
+    if about_own_documents(question):
+        allow_web = False
+
     try:
-        # similarity_search_with_score gives us the DISTANCE too, which
-        # as_retriever() hides. We need it for the check in step 2.
-        results = pipeline.vector_db.similarity_search_with_score(
-            lookup, k=pipeline.k
-        )
+        if wants_summary(lookup):
+            # A summary needs breadth, not the nearest few chunks. See
+            # spread_of_document above for why searching fails here.
+            results = spread_of_document(pipeline.vector_db, question=question)
+        else:
+            # similarity_search_with_score gives us the DISTANCE too, which
+            # as_retriever() hides. We need it for the check in step 2.
+            results = pipeline.vector_db.similarity_search_with_score(
+                lookup, k=pipeline.k
+            )
     except Exception as e:
         return friendly_error(e), []
+
+    # A summary is built from the whole document, so the distance checks below
+    # do not apply - nothing was measured. Answer straight from what we took.
+    if results and wants_summary(lookup):
+        context, sources = build_context(results)
+        prompt = PROMPT_TEMPLATE.format(context=context, question=lookup)
+        try:
+            return tidy_citations(pipeline.llm.invoke(prompt).content), sources
+        except Exception as e:  # noqa
+            return friendly_error(e), sources
 
     # Nothing even vaguely related came back, so there is no point paying for a
     # model call to confirm it. Go straight to the web.
