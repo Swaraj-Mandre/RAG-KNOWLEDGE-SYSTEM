@@ -27,6 +27,13 @@ st.markdown("""
 html, body, .stApp { font-family: 'Inter', -apple-system, sans-serif; }
 .stApp { background-color: #0D1117; color: #E6EDF3; }
 #MainMenu, footer, header { visibility: hidden; }
+/* ...but not the arrow that re-opens the sidebar. It lives inside that same
+   header, so hiding the header hid it too: collapsing the sidebar left no way
+   to bring it back, and reloading did not help because the browser remembers
+   the collapsed state. Visibility is inherited, so it has to be turned back on
+   explicitly on the button itself. */
+[data-testid="stExpandSidebarButton"],
+[data-testid="stExpandSidebarButton"] * { visibility: visible !important; }
 .stDeployButton { display: none; }
 
 [data-testid="stSidebar"] {
