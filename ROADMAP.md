@@ -19,7 +19,7 @@ added unless it earns its place.
 
 | Job | Primary | Fallback 1 | Fallback 2 |
 |-----|---------|------------|------------|
-| Embeddings | Mistral `mistral-embed-2312` (20M TPM, 1 RPS) | Gemini `gemini-embedding-001` (1K/day) | - |
+| Embeddings | Mistral `mistral-embed` (20M TPM, 1 RPS) | Gemini `gemini-embedding-001` (1K/day) | - |
 | Chat | Mistral `mistral-large-2512` (250K TPM, 1 RPS) | Groq `gpt-oss-120b` (1K RPD, 200K TPD) | Gemini model rotation (60/day) |
 | OCR / Vision | Mistral OCR API (625 pages/min) | Groq `qwen/qwen3.8-27b` | Gemini model rotation |
 

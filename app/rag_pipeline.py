@@ -38,18 +38,16 @@ Question: {question}
 Answer:"""
 #We used "if" statement , however it's written in english it mirrors 'Conditional Logic'
 
-# How far away a chunk is allowed to be before we treat it as unrelated.
+# How we decide a question is not covered by the documents.
 #
-# FAISS gives a distance, where SMALLER means more similar. We did not guess
-# this number - eval/run_eval.py measured it across 42 questions:
-#   answers that WERE in the documents     : 0.18 to 0.35
-#   questions the documents cannot answer  : 0.37 and above
-# So anything past ~0.36 is almost certainly not covered by the documents, and
-# we say so instead of letting the model invent an answer.
-RELEVANCE_LIMIT = 0.36
-
-# ...but that number turned out to be true for THAT deck, not for documents in
-# general, and it is worth understanding why before trusting any such number.
+# FAISS gives a distance, where SMALLER means more similar. The first version
+# of this used a single measured cutoff of 0.36, and the measurement was real:
+# across 42 questions on the slide deck, answers that WERE in the documents sat
+# between 0.18 and 0.35, and questions the documents could not answer sat at
+# 0.37 and above. A clean gap, so 0.36 separated them perfectly.
+#
+# That number turned out to describe THAT deck, not documents in general, and
+# it is worth understanding why before trusting any such number again.
 #
 # The slides are topical: one slide is about Big Omega, so a question about Big
 # Omega matches it closely. Now upload a one-page note holding a name, an
