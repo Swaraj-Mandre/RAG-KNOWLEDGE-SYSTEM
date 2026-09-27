@@ -384,20 +384,39 @@ with st.sidebar:
         # Say the limits out loud. A visitor who knows there are 15 questions
         # spends them well; one who finds out by being cut off just leaves.
         asked_now = sum(1 for m in st.session_state.messages if m["role"] == "user")
-        left = max(0, limits.MAX_QUESTIONS_PER_SESSION - asked_now)
-        used_today, per_day = limits.questions_today()
-        st.markdown(
-            f'<div class="sidebar-section">Demo limits</div>'
-            f'<div class="sidebar-footer">'
-            f'{left} of {limits.MAX_QUESTIONS_PER_SESSION} questions left this visit<br>'
-            f'up to {limits.MAX_FILES} files, {limits.MAX_FILE_MB} MB each<br>'
-            f'{used_today} of {per_day} questions used today<br><br>'
-            f'Your documents stay in your own session and are deleted '
-            f'automatically. Run it yourself with your own keys - see the README.'
-            f'</div>',
-            unsafe_allow_html=True)
+        # Reserve the spot now, fill it in later.
+        #
+        # Streamlit runs this file from top to bottom on every interaction. The
+        # sidebar is near the top, but the question is handled at the bottom -
+        # so anything drawn here shows the counts from BEFORE the question was
+        # asked, and nothing redraws it afterwards. Keeping an empty slot lets
+        # us write the real numbers once the question has been counted.
+        demo_slot = st.empty()
     else:
         st.markdown('<div class="sidebar-footer">Free tier · answers cite their source · local vector storage</div>', unsafe_allow_html=True)
+
+def show_demo_limits():
+    """Write the current demo counts into the slot kept in the sidebar.
+
+    Called once now, so the numbers appear immediately, and again after a
+    question has been answered so the counts are not one question behind."""
+    asked_now = sum(1 for m in st.session_state.messages if m["role"] == "user")
+    left = max(0, limits.MAX_QUESTIONS_PER_SESSION - asked_now)
+    used_today, per_day = limits.questions_today()
+    demo_slot.markdown(
+        f'<div class="sidebar-section">Demo limits</div>'
+        f'<div class="sidebar-footer">'
+        f'{left} of {limits.MAX_QUESTIONS_PER_SESSION} questions left this visit<br>'
+        f'up to {limits.MAX_FILES} files, {limits.MAX_FILE_MB} MB each<br>'
+        f'{used_today} of {per_day} questions used today<br><br>'
+        f'Your documents stay in your own session and are deleted '
+        f'automatically. Run it yourself with your own keys - see the README.'
+        f'</div>',
+        unsafe_allow_html=True)
+
+
+if DEMO:
+    show_demo_limits()
 
 st.markdown('<p class="main-title">RAG Knowledge System</p>', unsafe_allow_html=True)
 st.markdown('<p class="main-subtitle">Upload your documents and ask anything about them.</p>', unsafe_allow_html=True)
@@ -471,6 +490,11 @@ if prompt := st.chat_input("Ask a question about your documents..."):
         st.session_state.messages.append(
             {"role": "assistant", "content": answer, "sources": sources}
         )
+
+        # Redraw the sidebar counts now that this question has been counted,
+        # so they are not showing the state from before it was asked.
+        if DEMO:
+            show_demo_limits()
     except Exception as e:
         thinking.empty()
         st.error(f"Error: {str(e)}")

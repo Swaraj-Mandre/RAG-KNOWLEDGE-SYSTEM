@@ -128,8 +128,12 @@ Key facts worth remembering:
       is one they wrote. Each visitor gets a private index folder, swept
       after 2 hours. Caps on files, size, vision calls, questions per visit
       and questions per day. Set DEMO_MODE=1 to switch all of it on.
-- [ ] Incremental ingest: adding one document should not re-embed everything.
-      (Local convenience only - the demo builds a fresh index per visitor.)
+- [x] Incremental ingest: adding one document should not re-embed everything.
+      A note beside the index records which files went into it, fingerprinted by
+      contents rather than by name or date. A new file is appended on its own;
+      an edited or deleted file forces a rebuild, because removing one file's
+      chunks by id is easy to get subtly wrong and stale text answering
+      questions is worse than waiting.
 
 ---
 

@@ -16,6 +16,9 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", overrid
 
 DOCUMENTS_PATH = Path(__file__).resolve().parent.parent / "data" / "documents"
 
+# The file types we know how to read.
+SUPPORTED_TYPES = [".txt", ".pdf", ".png", ".jpeg", ".jpg", ".pptx", ".docx"]
+
 # Settings for reading diagram slides (see load_pptx)
 THIN_SLIDE_CHARS = 30    # real text shorter than this means the slide is really a picture
 THIN_PAGE_CHARS  = 80    # a PDF page with less text than this is probably a scan
@@ -389,15 +392,27 @@ def load_pdf(file_path, use_vision=True):
 
 
 # Load All Documents
-def load_all_documents(documents_path=None, use_vision=True):
+def find_documents(documents_path=None):
+    """List the files in a folder that we know how to read."""
+    folder = Path(documents_path) if documents_path else DOCUMENTS_PATH
+    return [f for f in folder.iterdir() if f.suffix.lower() in SUPPORTED_TYPES]
+
+
+def load_all_documents(documents_path=None, use_vision=True, only_files=None):
+    """Read documents into memory.
+
+    only_files lets the caller hand over an exact list instead of reading the
+    whole folder. That is what makes adding one new document cheap: we load
+    just that file rather than everything sitting beside it.
+    """
     if documents_path is None:
         documents_path = DOCUMENTS_PATH
     else:
         documents_path = Path(documents_path)
 
     all_documents = []
-    supported = [".txt", ".pdf", ".png", ".jpeg", ".jpg", ".pptx", ".docx"]
-    files_found = [f for f in documents_path.iterdir() if f.suffix.lower() in supported] #  f.suffix.lower() -> ".pdf"
+    files_found = list(only_files) if only_files is not None else \
+        [f for f in documents_path.iterdir() if f.suffix.lower() in SUPPORTED_TYPES]
 
     if not files_found:
         raise FileNotFoundError(
@@ -458,11 +473,106 @@ def check_capacity(chunks):
         exit(1) # raise a custom exception like "raise ValueError("Document exceeds maximum chunk limit (500). Please increase chunk size.")
 
 # Main Ingest Function 
-def ingest_documents(documents_path=None, vectorstore_path="vectorstore", use_vision=True):
+# Remembering what is already in the index
+#
+# Building the index means one embedding call for every chunk. Doing that again
+# for documents that have not changed is pure waste - it costs time and eats
+# the free daily budget for no new information.
+#
+# So alongside the index we keep a small note of which files went into it. Next
+# time, anything already listed is left alone and only genuinely new files are
+# read and added.
+#
+# Files are identified by a fingerprint of their contents rather than by name
+# or by modification date. Copying a file changes its date but not what is
+# inside it, and two different drafts can share a name. The contents are the
+# only honest answer to "is this the same document?".
+MANIFEST_NAME = "indexed_files.json"
+
+
+def file_fingerprint(path):
+    """A short, stable id for a file's contents."""
+    return hashlib.md5(Path(path).read_bytes()).hexdigest()
+
+
+def load_manifest(vectorstore_path):
+    """Which files are already in this index. Empty when there is no index."""
+    note = Path(vectorstore_path) / MANIFEST_NAME
+    try:
+        return json.loads(note.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_manifest(vectorstore_path, manifest):
+    note = Path(vectorstore_path) / MANIFEST_NAME
+    note.parent.mkdir(parents=True, exist_ok=True)
+    note.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+
+def plan_ingest(files, manifest, vectorstore_path):
+    """Work out what actually needs doing. Returns (what_to_do, files, why).
+
+    what_to_do is one of:
+      "nothing"    - every file is already indexed, exactly as it is now
+      "add"        - some new files to append to the existing index
+      "rebuild"    - start again from scratch
+
+    A rebuild is needed when a file that was indexed has been edited or
+    removed. We could in principle delete just that file's chunks, but the
+    index stores them by an internal id we would have to track separately, and
+    getting it wrong leaves stale text answering questions - which is worse
+    than a slow rebuild. So an edit means starting over, and that is a
+    deliberate choice rather than a missing feature.
+    """
+    index_exists = (Path(vectorstore_path) / "index.faiss").exists()
+    if not index_exists or not manifest:
+        return "rebuild", files, "no usable index yet"
+
+    now = {f.name: file_fingerprint(f) for f in files}
+
+    gone = [name for name in manifest if name not in now]
+    if gone:
+        return "rebuild", files, f"removed since last time: {', '.join(gone)}"
+
+    edited = [name for name, mark in now.items()
+              if name in manifest and manifest[name] != mark]
+    if edited:
+        return "rebuild", files, f"edited since last time: {', '.join(edited)}"
+
+    fresh = [f for f in files if f.name not in manifest]
+    if not fresh:
+        return "nothing", [], "everything is already indexed"
+
+    return "add", fresh, f"new: {', '.join(f.name for f in fresh)}"
+
+
+def ingest_documents(documents_path=None, vectorstore_path="vectorstore", use_vision=True,
+                     incremental=True):
     print("\nStarting Ingestion Pipeline...")
 
-    # 1. Load all documents
-    documents = load_all_documents(documents_path=documents_path, use_vision=use_vision)
+    # 0. Decide how much work is actually needed.
+    files = find_documents(documents_path)
+    if not files:
+        raise FileNotFoundError(
+            "   No documents found!\n"
+            "   Supported: .txt .pdf .pptx .docx .jpg .png\n"
+            "   Place files in data/documents/ folder"
+        )
+
+    manifest = load_manifest(vectorstore_path) if incremental else {}
+    action, to_load, why = plan_ingest(files, manifest, vectorstore_path) \
+        if incremental else ("rebuild", files, "incremental turned off")
+
+    print(f"   {action.title()}: {why}")
+
+    if action == "nothing":
+        print("   Nothing to do - the index already matches your documents.")
+        return
+
+    # 1. Load only the documents we decided to read
+    documents = load_all_documents(documents_path=documents_path,
+                                   use_vision=use_vision, only_files=to_load)
     print(f"\nTotal Pages Loaded: {len(documents)}")
 
     # 2. Split into chunks
@@ -512,8 +622,33 @@ def ingest_documents(documents_path=None, vectorstore_path="vectorstore", use_vi
     else:
         vector_db = FAISS.from_documents(chunks, embeddings)
 
+    # 6b. Adding to what is already there, rather than replacing it.
+    #
+    # We built the new chunks above exactly as a rebuild would, then open the
+    # existing index and append them. If opening it fails - a different
+    # embedding model, a damaged file - we keep what we just built instead of
+    # crashing, which turns a bad day into a plain rebuild.
+    if action == "add":
+        try:
+            existing = FAISS.load_local(vectorstore_path, embeddings,
+                                        allow_dangerous_deserialization=True)
+            existing.merge_from(vector_db)
+            vector_db = existing
+            print(f"   Added to the existing index ({len(chunks)} new chunks)")
+        except Exception as e:
+            print(f"   Could not open the existing index ({type(e).__name__}), "
+                  f"writing a fresh one instead")
+            action = "rebuild"
+
     # 7. Save locally
     vector_db.save_local(vectorstore_path)
+
+    # 7b. Write down what is now in the index, so the next run can skip it.
+    if action == "add":
+        manifest.update({f.name: file_fingerprint(f) for f in to_load})
+    else:
+        manifest = {f.name: file_fingerprint(f) for f in files}
+    save_manifest(vectorstore_path, manifest)
     print("   Vector database created and saved!")
     print(f"   Location: {vectorstore_path}/  (built with {providers.embedding_name()})")
 
