@@ -8,8 +8,6 @@ Ask questions about your own documents, and get answers that show exactly which 
 
 **Try it live:** [rag-knowledge-system.streamlit.app](https://rag-knowledge-system.streamlit.app)
 
-Upload a document of your own. The demo is free, needs no sign-up, and your file stays in your session only.
-
 ---
 
 ## The problem
