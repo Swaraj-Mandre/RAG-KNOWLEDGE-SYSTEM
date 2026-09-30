@@ -30,4 +30,3 @@ Modular project structure
 GitHub repo organization
 
 weaviate
-AIzaSyCpxq0D6EFl9-AGtbT3DCgm4xerQUnFPAo

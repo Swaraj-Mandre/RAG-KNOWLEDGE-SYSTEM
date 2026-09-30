@@ -58,7 +58,7 @@ Most small RAG projects stop at "it returns an answer". These are the parts that
 
 **It reads slides that look empty.** In the test deck, 32 of 60 slides held only 86 characters of repeated footer text. The actual content was inside pasted screenshots. Today, 141 of 249 indexed pieces come from pictures.
 
-**It is measured, not assumed.** 42 fixed questions, 22 the documents can answer and 20 they cannot. The second group checks that it refuses instead of inventing.
+**It is measured, not assumed.** 42 fixed questions, 22 the documents can answer and 20 they cannot. The second group exists to check that wrong matches land measurably further away than right ones.
 
 **It handles follow-up questions.** "Summarize that in three points" has no subject in it. The question is rewritten into one that stands alone before searching.
 
@@ -72,10 +72,14 @@ From `eval/run_eval.py`, run against 42 fixed questions.
 
 | Measure | Result |
 |---|---|
-| Correct piece found in top 5 | 100% |
 | Correct piece ranked first | 68.2% |
+| Correct piece in top 3 | 86.4% |
+| Correct piece in top 5 | 100% |
 | Average ranking score (1.0 perfect) | 0.787 |
-| Questions never answered | 0 |
+
+Read the first row, not the last. Some questions are answered across a run of slides, so the answer key accepts any one of them, five on average. That makes the top-5 figure easier to reach than it looks. Ranking the right piece first is the number worth judging this on.
+
+This measures retrieval only. It does not test the refusal, because the script never calls the writing model.
 
 Reading pictures raised top-5 accuracy from 81.8% to 95.5% and cut never-found questions from 4 to 1. Full write-up, including a correction that raised the score and why it was legitimate: [eval/RESULTS.md](eval/RESULTS.md)
 

@@ -28,6 +28,18 @@ budget, and its OCR is a purpose-built document API rather than a vision model
 used for OCR. One primary provider keeps the code simple; the fallback chain
 costs little extra once it exists and protects against the monthly cap.
 
+**What actually shipped, and why it differs.** The chat order in
+`app/providers.py` is Groq `openai/gpt-oss-120b` first, then Mistral
+`ministral-14b-latest`, then three Gemini models in turn. The reasoning
+changed once the models were tried side by side: the 120B model writes
+noticeably better answers, and roughly 110 questions a day is enough for a
+project this size, so it is worth spending first. Mistral moved to second
+because its enormous per-minute budget is exactly what you want in the model
+you fall back to, not the one you burn through. `mistral-large-2512` was
+dropped in favour of the smaller `ministral-14b-latest` for the same reason.
+This table is left as it was written, because a plan that was later revised is
+more useful than one quietly edited to look correct.
+
 **Caveat:** Mistral's Limits page shows per-minute limits only. A plan-level
 monthly ceiling (~1B tokens/month on the free tier) exists but is not visible
 there. Watch Admin > API > Usage.
@@ -166,6 +178,26 @@ Disabling uploads in demo mode is the single biggest win: it removes the
 expensive operations (embedding + OCR), removes the collision where two visitors
 overwrite each other's index, and removes the liability of strangers' documents
 sitting on a shared container.
+
+**Reversed. Uploads are on in the public demo.** The argument above is sound on
+cost and safety and wrong on the thing that matters: nobody trusts a demo that
+only answers questions about a document the author chose. A visitor has no way
+of telling whether the answers were tuned in advance. Letting them bring their
+own file is the whole proof.
+
+The three objections were answered rather than avoided:
+
+- **Cost.** Capped instead of removed, in `app/limits.py`: 3 files, 10 MB each,
+  12 pictures per visitor, 15 questions per visit, 250 a day across everybody.
+- **Collision.** Each visitor gets an index in a private folder with a random
+  name, so no two visitors can reach each other's documents.
+- **Liability.** Uploaded files are deleted as soon as they have been indexed,
+  and the index folder itself is swept once it goes unused.
+
+This turned out to matter far beyond the demo. Real visitors upload documents
+nothing was ever tuned on, and that is what exposed the relevance cutoff of
+0.36 as a property of one slide deck rather than of documents in general. With
+a preloaded corpus that bug would have shipped and stayed hidden.
 
 Skipped deliberately: IP rate limiting (Streamlit Cloud does not reliably expose
 client IP, and NAT means users share them) and CAPTCHA (friction, overkill).

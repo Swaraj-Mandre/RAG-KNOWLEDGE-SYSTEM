@@ -93,6 +93,21 @@ def session_dir(session_id):
     return base_dir() / f"session_{session_id}"
 
 
+def touch_session(session_id):
+    """Say that this visitor is still here.
+
+    The sweep below decides what is stale from when a folder was last changed.
+    Asking a question never changes the folder, it only reads from it - so
+    somebody who uploads a document and then spends a long afternoon reading
+    answers would have their own index swept away underneath them. Marking the
+    folder on every question keeps it alive for as long as it is being used.
+    """
+    try:
+        os.utime(session_dir(session_id), None)
+    except OSError:
+        pass        # folder already gone, which the caller will notice anyway
+
+
 def cleanup_old_sessions(max_age_hours=SESSION_MAX_AGE_HOURS):
     """Delete visitor folders that have not been touched for a while.
 

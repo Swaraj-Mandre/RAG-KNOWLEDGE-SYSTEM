@@ -323,55 +323,103 @@ with st.sidebar:
 
         status_placeholder = st.empty()
         status_placeholder.markdown('<div class="status-processing"><span class="status-dot"></span>Ingesting documents...</div>', unsafe_allow_html=True)
+        inbox = None          # set inside the try, cleaned up in the finally
         try:
             # Cap how many pictures the vision model may read for this visitor.
             # None means no cap, which is what you get on your own machine.
             from ingest import set_vision_budget
             set_vision_budget(limits.MAX_VISION_IMAGES if DEMO else None)
 
-            temp_dir = tempfile.mkdtemp()
+            # Where the uploaded files are written before they are read.
+            #
+            # On the public demo they go to a scratch folder inside the demo's
+            # own temp area, and are deleted the moment indexing is finished.
+            # They were previously written to a folder nobody ever cleaned up,
+            # while the sidebar told visitors their files were removed
+            # automatically. The sidebar was wrong, so the code is now right.
+            #
+            # On your own machine they join the rest of your material in
+            # data/documents, because that is what processing a document should
+            # mean locally: the file is yours, and it is still there tomorrow.
+            if DEMO:
+                inbox = Path(tempfile.mkdtemp(dir=limits.base_dir()))
+            else:
+                inbox = Path(__file__).resolve().parent.parent / "data" / "documents"
+                inbox.mkdir(parents=True, exist_ok=True)
+
             saved_files = []
             for file in uploaded:
-                file_path = Path(temp_dir) / file.name
-                with open(file_path, "wb") as f:
+                with open(inbox / file.name, "wb") as f:
                     f.write(file.getbuffer())
                 saved_files.append(file.name)
 
-            # Build the new index NEXT TO the old one, then swap.
-            #
-            # The old code deleted the index first and then started indexing.
-            # If indexing then failed halfway - a quota error is the usual
-            # reason - the working index was already gone and there was no way
-            # back. Building somewhere else first means a failure costs nothing.
-            # Named after this visitor's own folder, not a fixed name: two
-            # people uploading at the same moment must not share a staging
-            # directory, or each would overwrite the other's half-built index.
-            staging = VECTORSTORE.parent / (VECTORSTORE.name + "_building")
-            if staging.exists():
-                shutil.rmtree(staging)
+            from ingest import ingest_documents, load_manifest
 
-            from ingest import ingest_documents
-            ingest_documents(documents_path=temp_dir, vectorstore_path=str(staging))
+            if DEMO:
+                # Build the new index NEXT TO the old one, then swap.
+                #
+                # The old code deleted the index first and then started
+                # indexing. If indexing then failed halfway - a quota error is
+                # the usual reason - the working index was already gone and
+                # there was no way back. Building somewhere else first means a
+                # failure costs nothing. Named after this visitor's own folder,
+                # not a fixed name: two people uploading at the same moment
+                # must not share a staging directory, or each would overwrite
+                # the other's half-built index.
+                staging = VECTORSTORE.parent / (VECTORSTORE.name + "_building")
+                if staging.exists():
+                    shutil.rmtree(staging)
 
-            # Indexing worked, so now it is safe to replace the old index.
-            if VECTORSTORE.exists():
-                shutil.rmtree(VECTORSTORE)
-            staging.rename(VECTORSTORE)
+                ingest_documents(documents_path=str(inbox),
+                                 vectorstore_path=str(staging))
+
+                # Indexing worked, so now it is safe to replace the old index.
+                if VECTORSTORE.exists():
+                    shutil.rmtree(VECTORSTORE)
+                staging.rename(VECTORSTORE)
+            else:
+                # Add to the index that is already there, rather than building
+                # a new one from the uploaded files alone.
+                #
+                # Building a separate index and swapping it in is right for the
+                # demo, where each visitor should only ever see their own
+                # upload. Locally it was quietly destructive: processing one
+                # new file threw away everything else you had already indexed,
+                # because the fresh folder had no record of it. Pointing the
+                # ingest at data/documents instead means it sees the whole
+                # collection, skips what it has already read, and adds only
+                # what is new. Exactly what running ingest.py does.
+                ingest_documents(documents_path=str(inbox),
+                                 vectorstore_path=str(VECTORSTORE))
 
             from rag_pipeline import initialize_pipeline
             st.session_state.chain = initialize_pipeline(str(VECTORSTORE))
-            st.session_state.uploaded_files = saved_files
+
+            # Locally the index may now hold more than was just uploaded, so
+            # list what is actually in it rather than only the new arrivals.
+            indexed = sorted(load_manifest(str(VECTORSTORE))) if not DEMO else []
+            st.session_state.uploaded_files = indexed or saved_files
             st.session_state.messages = []
             status_placeholder.markdown(f'<div class="status-ready">{len(saved_files)} file(s) ready</div>', unsafe_allow_html=True)
         except Exception as e:
             status_placeholder.empty()
             st.error(f"Error: {str(e)}")
+        finally:
+            # The raw uploads have been read into the index by now, so the copy
+            # is no longer needed. Deleting it here rather than leaving it for
+            # the two-hourly sweep means a visitor's file is gone within
+            # seconds, which is what the sidebar promises them.
+            if DEMO and inbox is not None:
+                shutil.rmtree(inbox, ignore_errors=True)
 
     if st.session_state.uploaded_files:
         st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
         st.markdown('<div class="sidebar-section">Loaded</div>', unsafe_allow_html=True)
         for f in st.session_state.uploaded_files:
-            st.markdown(f'<div class="file-chip"><span class="file-chip-dot"></span>{f}</div>', unsafe_allow_html=True)
+            # escape() because a file name is text somebody else chose. Naming
+            # a file with a tag in it should show that tag, not run it.
+            st.markdown(f'<div class="file-chip"><span class="file-chip-dot"></span>'
+                        f'{html.escape(f)}</div>', unsafe_allow_html=True)
 
     st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
     if st.button("Clear chat", disabled=len(st.session_state.messages) == 0, key="clear_btn"):
@@ -383,7 +431,7 @@ with st.sidebar:
     if DEMO:
         # Say the limits out loud. A visitor who knows there are 15 questions
         # spends them well; one who finds out by being cut off just leaves.
-        asked_now = sum(1 for m in st.session_state.messages if m["role"] == "user")
+        #
         # Reserve the spot now, fill it in later.
         #
         # Streamlit runs this file from top to bottom on every interaction. The
@@ -457,6 +505,7 @@ if prompt := st.chat_input("Ask a question about your documents..."):
             st.warning(why_not)
             st.stop()
         limits.record_question()   # counts towards today's shared total
+        limits.touch_session(st.session_state.session_id)   # still in use
 
     render_user(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})

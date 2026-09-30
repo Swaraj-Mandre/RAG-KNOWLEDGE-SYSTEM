@@ -12,3 +12,7 @@ data/documents/SwarajMandre_Resume.pdf
 data/documents/CF FINAL REPORT.docx
 data/documents/DMV theory Assignments.pdf
 data/documents/Arduino PLC.pptx
+
+# Word documents are personal here: college submissions in data/documents and
+# the walkthrough guide in the project root. None of them belong in a public repo.
+*.docx

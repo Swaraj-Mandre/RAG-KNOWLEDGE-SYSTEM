@@ -196,3 +196,39 @@ that the documents clearly do answer.
 
 The retrieval numbers higher up this page are unaffected - they measure which
 chunks come back, not what is done with them afterwards.
+
+## How generous is the answer key?
+
+Worth stating plainly, because "100% in the top 5" reads better than it
+deserves to.
+
+Some questions in this deck are genuinely answered across a run of slides.
+"What do Big-O, Big-Omega and Big-Theta mean?" is spread over slides 32 to 43,
+so the answer key accepts any one of those twelve as correct. Across the 22
+answerable questions the key accepts **five slides on average**, and only
+**four questions have exactly one correct slide**.
+
+That makes hit@5 much easier to reach than the number suggests. It is still a
+fair measure of "did the reader get shown something useful", but it is not a
+measure of precision.
+
+**Read hit@1 instead.** 68.2% is the honest headline: on two questions in
+three, the very first chunk returned was a correct one. That figure is not
+inflated by a wide answer key nearly as much, because there is only one first
+place to win.
+
+## What this eval does not measure
+
+`run_eval.py` never calls the writing model. It embeds each question, searches,
+and records where the correct chunk landed. That is all.
+
+So the 20 out-of-document questions do **not** test whether the system refuses
+to answer them. They test something narrower and still useful: that wrong
+matches land measurably further away than right ones (0.372 and up, against
+0.181 to 0.349 for correct matches).
+
+The actual refusal is decided at answer time, by the model reading the chunks
+and replying with a sentinel, and nothing here measures how often it gets that
+right. Measuring it would mean 42 model calls per run instead of 42 embedding
+calls, and an answer key of expected refusals. That is a real gap, and it is
+listed as a gap rather than glossed over.

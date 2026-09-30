@@ -116,9 +116,15 @@ def load_image(file_path):
         mime = "image/png" if suffix == ".png" else "image/jpeg"
         # nt -> mimetypes.guess_type(file_path)[0]
 
+        # from_image is True because every word of this came out of a vision
+        # model looking at a picture. The source list uses it to label the
+        # chunk "read from a picture", which warns the reader that it could
+        # have been misread. A JPG has no text to read any other way, so it is
+        # always True here.
         return [Document(
             page_content=describe_image(image_bytes, mime),
-            metadata={"source": Path(file_path).name, "type": "image"}
+            metadata={"source": Path(file_path).name, "type": "image",
+                      "from_image": True}
         )]
     except Exception as e:
         print(f"   Could not process image {Path(file_path).name}: {e}")
@@ -447,7 +453,7 @@ def load_all_documents(documents_path=None, use_vision=True, only_files=None):
                 doc.metadata["source"] = file.name
 
             all_documents.extend(docs)
-            print(f"      {file.name} — {len(docs)} section(s) loaded")
+            print(f"      {file.name}: {len(docs)} section(s) loaded")
 
         except Exception as e:
             print(f"      Skipping {file.name}: {e}")
@@ -468,9 +474,17 @@ def check_capacity(chunks):
         print("   Large - adding delays between batches")
         return True
     else:
-        print("    Too large! Increase chunk_size to reduce chunks")
-        print(f"   Try chunk_size=2000 to get ~{total//2} chunks")
-        exit(1) # raise a custom exception like "raise ValueError("Document exceeds maximum chunk limit (500). Please increase chunk size.")
+        # Raise rather than exit(1). exit() throws SystemExit, which does NOT
+        # inherit from Exception, so every "except Exception" in the app walks
+        # straight past it - including the one wrapped around processing in the
+        # web interface. A visitor uploading a very large deck got a page that
+        # simply stopped, with no message at all. A ValueError is caught there
+        # and shown properly.
+        raise ValueError(
+            f"That comes to {total} chunks, and the limit is 500. "
+            f"Try a smaller document, or raise chunk_size in ingest.py "
+            f"(chunk_size=2000 would give roughly {total // 2})."
+        )
 
 # Main Ingest Function 
 # Remembering what is already in the index
@@ -628,6 +642,7 @@ def ingest_documents(documents_path=None, vectorstore_path="vectorstore", use_vi
     # existing index and append them. If opening it fails - a different
     # embedding model, a damaged file - we keep what we just built instead of
     # crashing, which turns a bad day into a plain rebuild.
+    merge_failed = False
     if action == "add":
         try:
             existing = FAISS.load_local(vectorstore_path, embeddings,
@@ -638,14 +653,24 @@ def ingest_documents(documents_path=None, vectorstore_path="vectorstore", use_vi
         except Exception as e:
             print(f"   Could not open the existing index ({type(e).__name__}), "
                   f"writing a fresh one instead")
-            action = "rebuild"
+            merge_failed = True
 
     # 7. Save locally
     vector_db.save_local(vectorstore_path)
 
     # 7b. Write down what is now in the index, so the next run can skip it.
-    if action == "add":
+    #
+    # The note must describe what is REALLY in the index, never what we meant
+    # to put there. That matters in one case: the merge just above failing. We
+    # then save only the new chunks, so writing down every file would be untrue
+    # - the next run would read the note, decide there was nothing left to do,
+    # and the older documents would be gone with nothing said about it. Writing
+    # down only what we actually saved means the next run notices the rest are
+    # missing and puts them back.
+    if action == "add" and not merge_failed:
         manifest.update({f.name: file_fingerprint(f) for f in to_load})
+    elif merge_failed:
+        manifest = {f.name: file_fingerprint(f) for f in to_load}
     else:
         manifest = {f.name: file_fingerprint(f) for f in files}
     save_manifest(vectorstore_path, manifest)
