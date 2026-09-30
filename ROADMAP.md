@@ -132,9 +132,21 @@ Key facts worth remembering:
       Last 3 turns kept. A follow-up is rewritten into a standalone question
       before searching, but only when a cheap word check says it needs it -
       so a normal question still costs one API call, not two.
-- [x] Web fallback with honest source labelling - cheap once citations exist.
-      DuckDuckGo (no API key), snippets only, answers labelled as web-sourced
-      with links. Can be switched off with `ask(..., allow_web=False)`.
+- [x] ~~Web fallback with honest source labelling.~~ **Built, then removed.**
+      DuckDuckGo with no API key, snippets only, answers labelled as coming
+      from the web. It worked, and it was still the wrong feature.
+
+      Two reasons. The first is that it answered the wrong question: somebody
+      who uploads their own report wants to know what is in that report, and a
+      link to a stranger's website is not a worse answer, it is an answer to
+      something they did not ask. The second is that it hid the real weakness.
+      Whenever retrieval came up short the web quietly covered for it, so the
+      system looked fine while the part that actually matters was not.
+
+      What replaced it is better: when the documents only mention a subject in
+      passing, the answer now reports that little detail and says plainly that
+      there is no more. A partial answer out of the reader's own file is worth
+      more than a confident paragraph from somewhere they never chose.
 - [x] Cap and isolate the public demo (session-scoped index, rate limit).
       Uploads stay ON - a visitor only trusts the answers when the document
       is one they wrote. Each visitor gets a private index folder, swept

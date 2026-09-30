@@ -12,25 +12,37 @@ import providers
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=True)
 
 # Prompt Template
-PROMPT_TEMPLATE = """You are a helpful AI assistant with access to document chunks below.
+PROMPT_TEMPLATE = """You answer questions using only the extracts below, which come
+from the reader's own documents. You have no other source of information.
 
-Answer the user's question based on the context provided.
-- If asked to summarize, summarize everything in the context
-- If asked for topics/headings, list them all
-- If asked a specific question, answer specifically
-- Use bullet points, headings, and examples where helpful
-- If the context does not answer the question, reply with exactly NOT_IN_DOCUMENTS
-  and nothing else. Do not guess, and do not answer from your own knowledge.
-  This is important: it is how the system knows to go and look elsewhere.
+Understanding the question
+- It may be short, informal, or carry spelling and grammar mistakes. Work out
+  what the person meant and answer that. Never correct their wording, and never
+  ask them to rephrase.
+- "what document is about", "summry of this", "tell me abt X" mean exactly what
+  their tidy versions mean. Read the intent, not the spelling.
 
-Every chunk below is numbered. After each fact you state, put the number of the
-chunk it came from in square brackets, like [1] or [2][3]. Do not cite a number
-that is not listed below.
+Deciding how much to say
+- When the extracts answer the question, answer it properly.
+- When the extracts only touch on the subject in passing, give whatever IS
+  there, however little, and then say in one plain sentence that this is all the
+  documents contain about it. Do not fill the gap from your own knowledge, and
+  do not pad the answer out to look fuller than the source really is.
+- Only when nothing in the extracts relates to the question at all, reply with
+  exactly NOT_IN_DOCUMENTS and nothing else.
 
-Write any mathematics in plain text, for example T(n) = 2T(n/2) + n or O(n log n).
-Do not use LaTeX, because it will be shown as raw symbols.
+Never invent a fact, number, name or date that is not in the extracts.
 
-Context:
+Citing
+Each extract is numbered. After each fact you state, put the number it came from
+in square brackets, like [1] or [2][3]. Never cite a number that is not listed.
+
+Writing
+- Short headings and bullet points where they genuinely help.
+- Write mathematics in plain text, for example T(n) = 2T(n/2) + n or O(n log n).
+  Never use LaTeX, because the reader is shown the raw symbols.
+
+Extracts:
 {context}
 
 Question: {question}
@@ -60,8 +72,8 @@ Answer:"""
 # one deck is the wrong tool. So we use two much weaker rules instead:
 #
 #   FAR_LIMIT   - past this, nothing retrieved is plausibly related, so we can
-#                 skip the model entirely and go straight to the web. It is set
-#                 loose on purpose; it is a filter for nonsense, not a judge.
+#                 say so without paying for a model call at all. It is set loose
+#                 on purpose; it is a filter for nonsense, not a judge.
 #   SPREAD      - having found the best chunk, keep the others that are nearly
 #                 as good and drop the rest. This is relative, so it adapts to
 #                 whatever the document happens to be.
@@ -71,10 +83,29 @@ Answer:"""
 FAR_LIMIT = 0.75
 SPREAD = 0.12
 
-# The exact words the model is told to reply with when the chunks do not answer
-# the question. Asking for a fixed string, rather than trying to guess from
-# phrasing, means we can detect it reliably and go and search the web instead.
+# The exact words the model is told to reply with when NOTHING in the chunks
+# relates to the question. Asking for a fixed string, rather than trying to
+# guess from phrasing, means we can detect it reliably and replace it with a
+# sentence written for the reader.
+#
+# Note how narrow this is. The model is told to use it only when there is no
+# connection at all. A subject the documents mention briefly is not this case:
+# there the model reports the little it found and says that is all there is.
+# That distinction is the whole point - a half answer from the reader's own
+# document beats a refusal.
 NOT_IN_DOCUMENTS = "NOT_IN_DOCUMENTS"
+
+# What the reader sees in place of the marker above.
+NOTHING_ON_THIS = (
+    "I could not find anything about that in your documents. They may not cover "
+    "it, or it may be worded quite differently inside them - it is worth trying "
+    "again with the words you think the document itself would use."
+)
+
+NOTHING_INDEXED = (
+    "There is nothing indexed yet, so there is nothing for me to read. Upload a "
+    "document from the sidebar and press Process first."
+)
 
 # Load Embeddings
 def load_embeddings():
@@ -161,7 +192,6 @@ def build_context(results):
             "label": label,
             "distance": round(float(distance), 3),
             "from_image": bool(chunk.metadata.get("from_image")),
-            "kind": "document",   # web_search.py marks its own sources "web"
         })
 
     return "\n\n".join(blocks), sources
@@ -284,17 +314,6 @@ FILLER_WORDS = {
 # "it?" match the lists above.
 WORD_PATTERN = re.compile(r"[a-z0-9]+")
 
-# Words that show the question is about the reader's OWN uploaded files. When
-# one of these appears, searching the web instead would be plainly wrong, no
-# matter how poorly the search went.
-OWN_DOCUMENT_PHRASES = (
-    "this ppt", "this pptx", "this document", "this doc", "this file",
-    "this pdf", "this deck", "this slide", "these slides", "this presentation",
-    "this report", "the document", "the ppt", "the pdf", "the file", "the deck",
-    "my document", "my ppt", "my pdf", "my file", "my slides", "my deck",
-    "uploaded", "attached",
-)
-
 # How many pieces of the document to read when writing a summary. Enough to
 # cover the whole thing, small enough to fit comfortably in one prompt.
 SUMMARY_CHUNKS = 12
@@ -334,12 +353,6 @@ def summary_target(question):
                and not word.isdigit()]
 
     return "topic" if subject else "whole"
-
-
-def about_own_documents(question):
-    """True when the question clearly refers to the reader's own files."""
-    text = question.lower()
-    return any(phrase in text for phrase in OWN_DOCUMENT_PHRASES)
 
 
 # Words a person uses to mean a particular kind of file, and the file endings
@@ -421,16 +434,19 @@ def tidy_citations(text):
 
 
 # ── Query Function ────────────────────────────────────────
-def ask(pipeline, question, history=None, allow_web=True):
-    """Answer one question and say where the answer came from.
+def ask(pipeline, question, history=None):
+    """Answer one question from the reader's documents, and say where from.
 
     Returns (answer, sources). `sources` is a list of dicts describing each
     chunk we used, so the UI can print them under the answer.
 
+    The documents are the only source. There is no second place to look, which
+    means every answer can be traced to a numbered extract from a file the
+    reader put there themselves.
+
     The steps are deliberately plain:
       1. find the closest chunks, and how close each one was
-      2. if even the best one is far away, the documents cannot answer this.
-         Search the web instead - and say clearly that we did.
+      2. if even the best is far away, say so without paying for a model call
       3. number the chunks and paste them into the prompt
       4. ask the model, and hand back the answer plus the source list
 
@@ -438,11 +454,6 @@ def ask(pipeline, question, history=None, allow_web=True):
     When it is given, a follow-up like "summarize that" is first rewritten into
     a question that stands on its own - see conversation.py for why that is
     necessary before searching.
-
-    `allow_web=False` turns step 2 back into a plain "I don't know". The app
-    leaves it on, so a question the documents cannot answer still gets a
-    labelled web answer. It is turned off automatically for any question about
-    the reader's own files, where an outside answer would be plainly wrong.
     """
     # What the user typed stays untouched for display; `lookup` is the version
     # we actually search with. They differ only for follow-up questions.
@@ -452,16 +463,6 @@ def ask(pipeline, question, history=None, allow_web=True):
         lookup = conversation.standalone_question(pipeline.llm, history, question)
 
     wanted = summary_target(lookup)
-
-    # Someone asking about "this ppt" wants an answer from their own upload.
-    # Answering from the web would be wrong even if the search went badly, so
-    # the web door is closed for this question before anything else happens.
-    #
-    # Asking what the document is about counts too, and closing the door on it
-    # here is what stops the failure that started all this: "what document is
-    # about?" being handed to a search engine while the file sat in the index.
-    if about_own_documents(question) or wanted == "whole":
-        allow_web = False
 
     try:
         if wanted == "whole":
@@ -481,30 +482,15 @@ def ask(pipeline, question, history=None, allow_web=True):
     # do not apply - nothing was measured. Answer straight from what we took.
     if wanted == "whole":
         if not results:
-            return ("There is nothing in your documents for me to summarise. "
-                    "Try processing a file first.", [])
+            return NOTHING_INDEXED, []
 
         context, sources = build_context(results)
-        prompt = PROMPT_TEMPLATE.format(context=context, question=lookup)
-        try:
-            answer = pipeline.llm.invoke(prompt).content
-        except Exception as e:  # noqa
-            return friendly_error(e), sources
-
-        # Even a spread of the whole file can come back unusable, for instance
-        # when a scanned document gave us nothing but page numbers. Without
-        # this check the reader was shown the raw word NOT_IN_DOCUMENTS with a
-        # list of twelve unrelated sources underneath it.
-        if NOT_IN_DOCUMENTS in answer:
-            return ("I could not make out enough from your documents to "
-                    "summarise them.", [])
-
-        return tidy_citations(answer), sources
+        return from_model(pipeline, context, sources, lookup)
 
     # Nothing even vaguely related came back, so there is no point paying for a
-    # model call to confirm it. Go straight to the web.
+    # model call to confirm it.
     if not results or results[0][1] > FAR_LIMIT:
-        return elsewhere(pipeline, lookup, allow_web)
+        return NOTHING_ON_THIS, []
 
     # Keep the best chunk and anything nearly as good, then stop. Measuring
     # from the best result rather than from a fixed number is what lets this
@@ -514,29 +500,35 @@ def ask(pipeline, question, history=None, allow_web=True):
     close_enough = [row for row in results if row[1] <= best + SPREAD]
 
     context, sources = build_context(close_enough)
-    prompt = PROMPT_TEMPLATE.format(context=context, question=lookup)
+    return from_model(pipeline, context, sources, lookup)
+
+
+def from_model(pipeline, context, sources, question):
+    """Send the chosen extracts to the model and tidy up what comes back.
+
+    Both routes through ask() end here, the whole-document summary and the
+    ordinary search, because from this point on they want exactly the same
+    handling. Keeping it in one function means the refusal can never be
+    forgotten on one branch and remembered on the other, which is precisely
+    the bug the summary route used to have.
+    """
+    prompt = PROMPT_TEMPLATE.format(context=context, question=question)
 
     try:
         answer = pipeline.llm.invoke(prompt).content
     except Exception as e:  # noqa
         return friendly_error(e), sources
 
-    # The model has now read the chunks and says they do not answer the
+    # The model has read the extracts and says nothing in them relates to the
     # question. It is a better judge of that than a distance ever was, because
-    # it can actually read the words. Treat it exactly like finding nothing.
+    # it can actually read the words. Note this is now genuinely rare: the
+    # prompt asks it to report a partial mention rather than refuse, so we only
+    # reach here when there is really nothing. The sources go with it, since
+    # listing chunks that turned out to be irrelevant helps nobody.
     if NOT_IN_DOCUMENTS in answer:
-        return elsewhere(pipeline, lookup, allow_web)
+        return NOTHING_ON_THIS, []
 
     return tidy_citations(answer), sources
-
-
-def elsewhere(pipeline, question, allow_web):
-    """The documents cannot answer this. Search the web, or say so honestly."""
-    if allow_web:
-        import web_search
-        answer, web_sources = web_search.answer_from_web(pipeline.llm, question)
-        return tidy_citations(answer), web_sources
-    return ("I don't have enough information in your documents to answer that.", [])
 
 
 def friendly_error(e):

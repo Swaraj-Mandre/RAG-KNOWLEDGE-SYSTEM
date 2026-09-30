@@ -28,4 +28,3 @@ faiss-cpu==1.13.2
 pymupdf==1.28.0              # PDF  (imported as "fitz")
 python-pptx==1.0.2           # PPTX
 python-docx==1.2.0           # DOCX
-ddgs==9.16.0                 # DuckDuckGo search, no API key needed

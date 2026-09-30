@@ -106,6 +106,20 @@ Click **Deploy** and wait for the build.
 
 ## Things worth knowing
 
+**Reboot after changing anything outside `streamlit_app.py`.** This one costs
+real time if you do not know it. Pushing new code does not restart the Python
+process. `streamlit_app.py` is run again from the top on every interaction, so
+your changes to it appear straight away, but `import limits` and `import ingest`
+hand back the copies already loaded in memory from the last boot. So you get the
+new file calling the old module, which shows up as a puzzling error like
+`module 'limits' has no attribute 'touch_session'` pointing at a line that is
+plainly correct in front of you.
+
+Open **Manage app**, click the three dots at the bottom right of the log panel,
+and choose **Reboot app**. Everything is re-imported and the error disappears.
+Rule of thumb: touched only `streamlit_app.py`, just push. Touched anything else
+in `app/`, push and then reboot.
+
 **The app sleeps.** A free app with no visitors goes to sleep and takes about
 thirty seconds to wake. That is normal. If you are sending the link to someone
 who matters, open it yourself a minute beforehand.

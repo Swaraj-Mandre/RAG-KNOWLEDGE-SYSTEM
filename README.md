@@ -24,8 +24,9 @@ It reads your documents, then answers from them and only from them.
 
 - **Ask in plain English.** No keywords, no guessing which file it is in.
 - **Every answer is checkable.** Each claim carries a number pointing to the real slide or page.
-- **It admits what it does not know.** If your documents cannot answer, it says so.
-- **It can look things up.** When the documents genuinely do not cover something, it searches the web and clearly labels that answer as coming from outside.
+- **It gives you what it found, not a shrug.** If your documents only mention something in passing, you get that detail plus a plain note that there is no more. A half answer from your own file beats a refusal.
+- **It admits what it does not know.** If nothing in your documents relates to the question, it says so rather than inventing an answer.
+- **It never goes outside your documents.** No web search, no general knowledge. Every sentence traces back to a numbered extract from a file you provided.
 - **It reads pictures too.** Slides where the content sits inside a screenshot are read by a vision model, not skipped.
 
 ---
@@ -41,9 +42,10 @@ ADDING A DOCUMENT
 
 ASKING A QUESTION
   question  ->  turn into numbers  ->  find the closest pieces
-            ->  close enough?
+            ->  anything related?
                   yes  ->  answer from those pieces, with sources
-                  no   ->  search the web, or say "I don't know"
+                  a bit ->  give what is there, and say that is all
+                  no   ->  say nothing in your documents covers it
 ```
 
 Turning text into numbers is what makes this work. Text about similar ideas produces similar numbers, even when the words are different. That is why "how long does this take to run" finds a slide about time complexity.
@@ -62,7 +64,7 @@ Most small RAG projects stop at "it returns an answer". These are the parts that
 
 **It handles follow-up questions.** "Summarize that in three points" has no subject in it. The question is rewritten into one that stands alone before searching.
 
-**It never mixes your documents with the internet.** Web answers are labelled, listed separately, and never blended with answers from your files.
+**Your documents are the only source.** There is no web search and no general knowledge to fall back on. That is a deliberate limit: an answer you cannot trace to your own file is not worth having, and a system with a second source will always be tempted to use it.
 
 ---
 
@@ -95,7 +97,6 @@ Reading pictures raised top-5 accuracy from 81.8% to 95.5% and cut never-found q
 | Text to numbers | Mistral `mistral-embed` |
 | Writing answers | Groq, Mistral, Gemini |
 | Reading pictures | Groq vision, Gemini fallback |
-| Web search | DuckDuckGo |
 
 Every service used has a free tier and needs no payment card.
 
@@ -148,7 +149,6 @@ app/
   ingest.py           reading documents, including pictures
   providers.py        which AI service to call, and what to do when it runs out
   conversation.py     remembering the last few turns
-  web_search.py       looking outside the documents
   limits.py           keeping the public demo safe and free
   query.py            the same thing in a terminal
 eval/
@@ -174,7 +174,7 @@ Worth knowing before you try it.
 - **It cannot count across a whole document.** "How many slides mention sorting" needs to read everything at once. It only looks at a handful of pieces.
 - **Editing a document rebuilds the index.** Adding a new file is cheap. Changing an existing one is not, by design, because leaving stale text behind is worse than waiting.
 - **Reading pictures is not perfect.** A vision model can misread a diagram, which is why anything taken from a picture is labelled in the source list.
-- **Web answers depend on search results.** When sources disagree it will say so, but it cannot tell you who is right.
+- **It only knows what you gave it.** Ask about something your documents do not cover and it will tell you so. That is the design, not a gap to be filled in later.
 - **Documents go to outside services to be read.** Fine for coursework and public material. Not suitable as-is for confidential files.
 
 ---

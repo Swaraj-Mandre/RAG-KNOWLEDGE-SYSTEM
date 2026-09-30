@@ -102,12 +102,6 @@ div[data-testid="stButton"]:nth-of-type(2) > button:disabled { color: #30363D; b
 .source-item { font-size: 12px; color: #7D8590; margin: 3px 0; line-height: 1.5; }
 .source-num { color: #7C3AED; font-weight: 600; margin-right: 6px; }
 .source-tag { font-size: 10px; color: #484F58; margin-left: 6px; }
-.source-link { color: #7D8590; text-decoration: none; border-bottom: 1px dotted #30363D; }
-.source-link:hover { color: #E6EDF3; border-bottom-color: #7D8590; }
-/* amber edge marks the whole block as outside material, not your documents */
-.sources-web { border-top-color: #9A6700; }
-.sources-web .sources-title { color: #9A6700; }
-.sources-web .source-num { color: #D29922; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse-dot { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
@@ -226,40 +220,21 @@ def render_sources(sources):
     taking the answer on trust. That is the whole point of citations."""
     if not sources:
         return ""   # never show an empty "Sources" heading
-    # Either every source is from the web, or every source is from the
-    # documents - ask() never mixes the two inside one answer.
-    from_web = sources[0].get("kind") == "web"
-    heading = "Sources - from the web, not your documents" if from_web else "Sources"
 
     rows = []
     for s in sources:
-        # Only ever link out to a normal web address. Escaping alone is not
-        # enough here: a href of "javascript:..." would still run when clicked,
-        # so we check the address actually starts with http before trusting it.
-        url = s.get("url") or ""
-        is_real_link = url.startswith("http://") or url.startswith("https://")
-
-        if is_real_link:
-            # A real link, so the reader can open the page and judge it.
-            # rel="noopener noreferrer" is the standard safety pair for any
-            # link opening a page we do not control.
-            safe_url = html.escape(url, quote=True)
-            body = (f'<a class="source-link" href="{safe_url}" target="_blank" '
-                    f'rel="noopener noreferrer">{html.escape(s["label"])}</a>')
-        else:
-            # Tell the reader when the text was read out of a picture by the
-            # vision model, because that can misread and is worth checking.
-            tag = '<span class="source-tag">read from a picture</span>' if s["from_image"] else ""
-            body = html.escape(s["label"]) + tag
-
+        # Tell the reader when the text was read out of a picture by the vision
+        # model, because that can misread and is worth checking.
+        tag = ('<span class="source-tag">read from a picture</span>'
+               if s.get("from_image") else "")
         rows.append(
             f'<div class="source-item">'
-            f'<span class="source-num">[{s["number"]}]</span>{body}</div>'
+            f'<span class="source-num">[{s["number"]}]</span>'
+            f'{html.escape(s["label"])}{tag}</div>'
         )
 
-    css_class = "sources sources-web" if from_web else "sources"
-    return (f'<div class="{css_class}">'
-            f'<div class="sources-title">{heading}</div>'
+    return ('<div class="sources">'
+            '<div class="sources-title">Sources</div>'
             + "".join(rows) + '</div>')
 
 

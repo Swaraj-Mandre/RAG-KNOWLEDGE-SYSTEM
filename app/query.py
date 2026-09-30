@@ -37,16 +37,11 @@ if __name__ == "__main__":
         # Show where the answer came from, so the numbers like [1] in the
         # answer above can be checked against the real documents.
         if sources:
-            # Web sources are printed with their link, so a claim from a
-            # stranger's website never looks like a claim from your own slides.
-            from_web = sources[0].get("kind") == "web"
             print()
-            print("Sources (from the web):" if from_web else "Sources:")
+            print("Sources:")
             for s in sources:
                 print(f"   [{s['number']}] {s['label']}")
-                if s.get("url"):
-                    print(f"       {s['url']}")
-                elif s["from_image"]:
+                if s.get("from_image"):
                     print("       (read from a picture)")
 
         # Store the turn so the next question can refer back to this one.
